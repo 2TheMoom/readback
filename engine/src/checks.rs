@@ -112,6 +112,14 @@ fn s<'a>(v: &'a Value, k: &str) -> &'a str {
     v.get(k).and_then(Value::as_str).unwrap_or("")
 }
 
+/// The account the money leaves from: the mandate's `spender` (an agent's own account), else its owner.
+fn spender(m: &Value) -> &str {
+    match s(m, "spender") {
+        "" => s(m, "owner"),
+        sp => sp,
+    }
+}
+
 fn strings(v: &Value) -> Vec<&str> {
     v.as_array().map(|a| a.iter().filter_map(Value::as_str).collect()).unwrap_or_default()
 }
@@ -327,7 +335,7 @@ fn intent_checks(out: &mut Outcome, intent: &Value, req: &Value, q: &Value, m: &
                 && tokens.len() == 1
                 && asset == s(req, "originAsset")
                 && amount.as_str() == Some(s(q, "amountIn"))
-                && s(&msg, "signer_id") == s(m, "owner")
+                && s(&msg, "signer_id") == spender(m)
                 && s(&msg, "deadline") == s(q, "deadline"),
         )
     })()

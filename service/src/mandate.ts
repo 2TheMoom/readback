@@ -14,6 +14,8 @@ export interface Mandate {
   cap: string; cap_symbol: string; cap_decimals: number;
   max_slippage_bps: number; refund_to: string[]; min_review_seconds: number; valid_until: string;
   fees?: { max_pct: number; same_value_assets: boolean };
+  /** The agent's own account the money leaves from, when it is not the owner's account. */
+  spender?: string;
 }
 export interface SignedMandate { mandate: Mandate; signature: { accountId: string; publicKey: string; signature: string; nonce: string } }
 
@@ -41,6 +43,7 @@ export function mandateMessage(m: Mandate): string {
   return [
     `Readback mandate ${m.id} for ${m.owner}.`,
     `${m.agent} may pay ${payees}, up to ${units(m.cap, m.cap_decimals)} ${m.cap_symbol} per payment, with slippage up to ${m.max_slippage_bps / 100}%.`,
+    ...(m.spender && m.spender !== m.owner ? [`Payments come only from ${m.spender}.`] : []),
     `Refunds go to ${m.refund_to.join(', ')}. Valid until ${m.valid_until}.`,
     `Anything else is held for me or refused.`,
     `Fingerprint: sha256:${fingerprint(m)}`,
@@ -49,7 +52,11 @@ export function mandateMessage(m: Mandate): string {
 
 export const MANDATE_RECIPIENT = process.env.READBACK_RECIPIENT ?? 'readback.app';
 
-/** Accept a mandate only if its owner signed exactly this mandate with a full-access key. */
+/**
+ * Accept a mandate only if its owner signed exactly this mandate with a full-access key. With a spender, that
+ * same key must also be a full-access key on the spender: otherwise anyone could sign a mandate that lets an
+ * agent spend from an account they do not control.
+ */
 export async function verifyMandate(f: Fetch, sm: SignedMandate): Promise<{ ok: boolean; reason: string }> {
   const { mandate: m, signature: s } = sm ?? ({} as SignedMandate);
   if (!m || !s) return { ok: false, reason: 'missing' };
@@ -61,5 +68,10 @@ export async function verifyMandate(f: Fetch, sm: SignedMandate): Promise<{ ok: 
   try { message = mandateMessage(m); } catch { return { ok: false, reason: 'malformed_mandate' }; }
   if (!verifyNep413(s, message, nonce, MANDATE_RECIPIENT)) return { ok: false, reason: 'bad_signature' };
   const key = await isFullAccessKey(f, s.accountId, s.publicKey);
-  return key.ok ? { ok: true, reason: 'ok' } : { ok: false, reason: `key_${key.reason}` };
+  if (!key.ok) return { ok: false, reason: `key_${key.reason}` };
+  if (m.spender && m.spender !== m.owner) {
+    const sp = await isFullAccessKey(f, m.spender, s.publicKey);
+    if (!sp.ok) return { ok: false, reason: sp.reason === 'rpc_unavailable_or_disagree' ? 'spender_rpc_unavailable_or_disagree' : 'owner_does_not_control_spender' };
+  }
+  return { ok: true, reason: 'ok' };
 }

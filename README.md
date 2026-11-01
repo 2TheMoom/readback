@@ -7,10 +7,10 @@ Status: in development for NEAR HACKATHON (1 to 14 November 2026). Tracks: secur
 ## What exists today
 
 - `docs/SPEC.md`: the 16 checks, the verdict rules and how each input is decoded.
-- `docs/test-vectors/`: 51 acceptance tests built on real, signed 1Click quotes and a real generated intent.
+- `docs/test-vectors/`: 54 acceptance tests built on real, signed 1Click quotes and a real generated intent.
 - `docs/THREAT-MODEL.md`: what can go wrong with Readback itself, and how it is handled.
 - `research/`: the experiments behind the spec, with reproducible scripts.
-- `engine/`: the check engine in Rust. All 16 checks; passes all 51 test vectors; never panics on hostile input; builds to a 190 KB WASI module (`readback-check`: JSON request on stdin, compact verdict on stdout) whose output is identical to the native build on every vector, within OutLayer's default fuel budget.
+- `engine/`: the check engine in Rust. All 16 checks; passes all 54 test vectors; never panics on hostile input; builds to a 190 KB WASI module (`readback-check`: JSON request on stdin, compact verdict on stdout) whose output is identical to the native build on every vector, within OutLayer's default fuel budget.
 - `service/`: the guard API in Node. Payouts to Solana, Ethereum, Base and Arbitrum. It checks the owner's signed mandate (NEP-413, signed by the owner with a full-access key, confirmed on two NEAR RPCs), fetches live chain facts from two independent RPCs per chain, runs the WASI engine and returns the verdict with the plain sentence. Any RPC that is down or disagrees gives HOLD or REFUSED, never CLEARED.
 - `agent/`: the agent-side guard, the only path from an agent to its signer. REFUSED never reaches the signer. HOLD asks a human, who sees the sentence, the full recipient address, the reasons and the request hash; only an explicit yes counts, and Readback looks again before anything is signed. The signer gets a frozen copy of exactly what was checked. An answer that is not about this exact request and mandate (`request_hash`, `mandate_fingerprint`), does not add up, or does not arrive at all counts as REFUSED.
 
@@ -20,7 +20,7 @@ The app is being built in this repository during the hackathon.
 
 ```
 cd engine
-cargo test                      # see: 51 of 51 vectors pass, plus unit and robustness tests
+cargo test                      # see: 54 of 54 vectors pass, plus unit and robustness tests
 ```
 
 ## Try the service
@@ -28,7 +28,7 @@ cargo test                      # see: 51 of 51 vectors pass, plus unit and robu
 ```
 cd service
 npm install && npm run engine   # the engine module needs Rust with the wasm32-wasip1 target
-npm test                        # see: 14 of 14 pass (all 51 vectors through WASI, mandates, end to end)
+npm test                        # see: 15 of 15 pass (all 54 vectors through WASI, mandates, end to end)
 npm start                       # POST /v1/readback, GET /v1/health on 127.0.0.1:8787
 ```
 

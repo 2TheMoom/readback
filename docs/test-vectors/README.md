@@ -4,7 +4,7 @@ The acceptance tests for the Readback check engine. Written before the hackathon
 
 ## Files
 
-- `vectors.json`: 51 vectors (13 Solana quote, 5 Base quote, 11 intent, 22 destination). Each has an `id`, a `kind`, its inputs, and a hand-written `expect`.
+- `vectors.json`: 54 vectors (13 Solana quote, 5 Base quote, 14 intent, 22 destination). Each has an `id`, a `kind`, its inputs, and a hand-written `expect`.
 - `fixtures/quotes/*.json`: real 1Click quote responses, signed by the 1Click manager key. The signatures stay verifiable forever.
 - `fixtures/intents/I_live.json`: a real unsigned intent from `POST /v0/generate-intent`, paired with `Q_live`.
 - `fixtures/mandates.json`: `M1` (NEAR USDC to Solana USDC, payee Acme) and `M2` (NEAR USDC to Base USDC, payees Dana and a contract vault).
@@ -30,7 +30,7 @@ The acceptance tests for the Readback check engine. Written before the hackathon
 ## How these were checked
 
 - Expectations were written by hand from `../SPEC.md`, not computed.
-- An independent reference evaluator (pre-hackathon spike, not product code) agrees with all 51.
+- An independent reference evaluator (pre-hackathon spike, not product code) agrees with the original 51. The three spender vectors (I12 to I14, mandate M3) were added on 1 Nov and are checked by the engine and service tests only.
 - Mutation test: switching off any one of the 16 checks, or the mandate-expiry rule, makes at least one vector fail.
 
 ## Known gaps (to extend during the build)

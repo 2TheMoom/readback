@@ -63,5 +63,36 @@
    "max_pct": 5,
    "same_value_assets": true
   }
+ },
+ "M3": {
+  "id": "M3",
+  "agent": "invoice-bot",
+  "dest_chain": "sol",
+  "payees": [
+   {
+    "label": "Acme",
+    "chain": "sol",
+    "address": "6UerpTi2CzrJR4iiMvNAgDxbfFVgxhs9cPPuuKkhCDVZ"
+   }
+  ],
+  "origin_assets": [
+   "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+  ],
+  "destination_assets": [
+   "nep141:sol-5ce3bf3a31af18be40ba30f721101b4341690186.omft.near"
+  ],
+  "cap": "300000000",
+  "max_slippage_bps": 50,
+  "refund_to": [
+   "readback-prework.near"
+  ],
+  "owner": "readback-prework.near",
+  "min_review_seconds": 60,
+  "valid_until": "2026-12-31T23:59:59Z",
+  "fees": {
+   "max_pct": 5,
+   "same_value_assets": true
+  },
+  "spender": "invoice-bot.readback-prework.near"
  }
 }

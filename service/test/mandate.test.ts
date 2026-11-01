@@ -48,3 +48,16 @@ test('mandates are refused when anything is off', async () => {
   assert.equal((await verifyMandate(f, stranger.signed)).reason, 'key_not_found', 'valid signature by a key not on the account');
   assert.equal((await verifyMandate(f, undefined as any)).reason, 'missing');
 });
+
+test('a mandate with a spender names it in the signed text and needs the owner key to control it', async () => {
+  const m = mandateFrom('M3');
+  assert.ok(mandateMessage(m).includes('Payments come only from invoice-bot.readback-prework.near.'));
+  assert.ok(!mandateMessage(mandateFrom('M1')).includes('Payments come only'), 'no spender, text unchanged');
+  const { signed, key } = signMandate(m);
+  const owner = `${m.owner}:${key.publicKey}`, spender = `${m.spender}:${key.publicKey}`;
+  assert.equal((await verifyMandate(fakeFetch({ nearKeys: { [owner]: 'FullAccess', [spender]: 'FullAccess' } }), signed)).reason, 'ok');
+  assert.equal((await verifyMandate(fakeFetch({ nearKeys: { [owner]: 'FullAccess' } }), signed)).reason, 'owner_does_not_control_spender');
+  assert.equal((await verifyMandate(fakeFetch({ nearKeys: { [owner]: 'FullAccess', [spender]: 'FunctionCall' } }), signed)).reason, 'owner_does_not_control_spender');
+  const swapped = structuredClone(signed); swapped.mandate.spender = 'someone-elses-agent.near';
+  assert.equal((await verifyMandate(fakeFetch({ nearKeys: { [owner]: 'FullAccess', [`someone-elses-agent.near:${key.publicKey}`]: 'FullAccess' } }), swapped)).reason, 'bad_signature');
+});

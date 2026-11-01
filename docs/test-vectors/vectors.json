@@ -1291,6 +1291,107 @@
      "format"
     ]
    }
+  },
+  {
+   "id": "I12",
+   "title": "Agent spends from its own account named as the mandate spender",
+   "kind": "intent",
+   "quote": "Q_live",
+   "intent": "I_live",
+   "mandate": "M3",
+   "now": "2026-10-25T09:40:00.927Z",
+   "expect": {
+    "verdict": "HOLD",
+    "warn": [
+     "fees"
+    ]
+   },
+   "rpc": {
+    "sol_account": [
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     },
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     }
+    ]
+   },
+   "mutate": [
+    {
+     "op": "set",
+     "path": "msg.signer_id",
+     "value": "invoice-bot.readback-prework.near"
+    }
+   ]
+  },
+  {
+   "id": "I13",
+   "title": "Mandate names a spender but the intent spends from the owner account",
+   "kind": "intent",
+   "quote": "Q_live",
+   "intent": "I_live",
+   "mandate": "M3",
+   "now": "2026-10-25T09:40:00.927Z",
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "intent_binding"
+    ],
+    "warn": [
+     "fees"
+    ]
+   },
+   "rpc": {
+    "sol_account": [
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     },
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     }
+    ]
+   }
+  },
+  {
+   "id": "I14",
+   "title": "No spender in the mandate, but the intent spends from another account",
+   "kind": "intent",
+   "quote": "Q_live",
+   "intent": "I_live",
+   "mandate": "M1",
+   "now": "2026-10-25T09:40:00.927Z",
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "intent_binding"
+    ],
+    "warn": [
+     "fees"
+    ]
+   },
+   "rpc": {
+    "sol_account": [
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     },
+     {
+      "owner": "11111111111111111111111111111111",
+      "data_len": 0
+     }
+    ]
+   },
+   "mutate": [
+    {
+     "op": "set",
+     "path": "msg.signer_id",
+     "value": "invoice-bot.readback-prework.near"
+    }
+   ]
   }
  ]
 }
