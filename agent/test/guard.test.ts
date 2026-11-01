@@ -11,8 +11,8 @@ const MINT = { owner: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', data_len: 8
 const URL = 'http://guard.test';
 
 /** The real service, answering through fetch. Call i uses chains[i] (the last one repeats). */
-function realService(chains: FakeChain[]) {
-  const { signed, key } = signMandate(mandateFrom('M1'));
+function realService(chains: FakeChain[], mandateId: 'M1' | 'M2' = 'M1') {
+  const { signed, key } = signMandate(mandateFrom(mandateId));
   let calls = 0;
   const f = (async (_url: any, init: any) => {
     const body = JSON.parse(init.body);
@@ -66,7 +66,7 @@ test('HOLD: the human sees the sentence, the reasons and the request hash; decli
   const g = createGuard({ url: URL, agent: 'invoice-bot', signedMandate: svc.signed, fetch: svc.fetch, askHuman: async (r) => { shown = r.message; return false; } });
   const d = await g.pay(quote(), s.execute);
   assert.deepEqual([d.outcome, d.reason, s.seen.length], ['held', 'human_declined', 0]);
-  assert.match(shown, /invoice-bot asks to send 250 USDC from NEAR to 6Uer…CDVZ on Solana/);
+  assert.ok(shown.includes('invoice-bot asks to send 250 USDC from NEAR to Acme (6Uer…CDVZ) on Solana'), shown);
   assert.ok(shown.includes('Full recipient address: 6UerpTi2CzrJR4iiMvNAgDxbfFVgxhs9cPPuuKkhCDVZ'));
   assert.match(shown, /Held because: mint \(rpc_unavailable_or_disagree\)/);
   assert.ok(shown.includes(`Request: sha256:${d.request_hash}`));
@@ -196,4 +196,43 @@ test('a HOLD that gains a new reason after approval is refused', async () => {
   const s = signer();
   const d = await createGuard({ url: URL, agent: 'invoice-bot', signedMandate: api.signed, fetch: api.fetch, askHuman: async () => true }).pay(api.req, s.execute);
   assert.deepEqual([d.outcome, d.reason, s.seen.length], ['refused', 'changed_since_approval', 0]);
+});
+
+// --- EVM: Base, with eth_getCode answers recorded from two real Base RPCs ---
+
+const baseCode = (addr: string) => load('fixtures/rpc/base-eth_getCode.json').answers[addr.toLowerCase()];
+const baseQuote = (name: string) => { const q = quote(name); return { req: q, code: baseCode(q.quote.quoteRequest.recipient) }; };
+
+test('Base: paying a saved payee with no contract code clears; the signer runs', async () => {
+  const { req, code } = baseQuote('Q_base_payee');
+  const svc = realService([{ evm: code }], 'M2'), s = signer();
+  const d = await createGuard({ url: URL, agent: 'payroll-agent', signedMandate: svc.signed, fetch: svc.fetch }).pay(req, s.execute);
+  assert.deepEqual([d.outcome, s.seen.length], ['executed', 1], d.note);
+  assert.ok(d.sentence!.includes('to Dana, payroll (0xF412…6128) on Base'), d.sentence);
+});
+
+test('Base: an address-poisoning lookalike of the payee is refused', async () => {
+  const { req, code } = baseQuote('Q_base_lookalike');
+  const svc = realService([{ evm: code }], 'M2'), s = signer();
+  const d = await createGuard({ url: URL, agent: 'payroll-agent', signedMandate: svc.signed, fetch: svc.fetch, askHuman: async () => true }).pay(req, s.execute);
+  assert.deepEqual([d.outcome, s.seen.length], ['refused', 0]);
+  assert.ok(d.holds.some((h) => h.check === 'lookalike' && h.status === 'bad'));
+});
+
+test('Base: a saved payee that is a contract is held, and the human gets the full 0x address', async () => {
+  const { req, code } = baseQuote('Q_base_weth');
+  const svc = realService([{ evm: code }], 'M2'), s = signer();
+  let shown = '';
+  const d = await createGuard({ url: URL, agent: 'payroll-agent', signedMandate: svc.signed, fetch: svc.fetch, askHuman: async (r) => { shown = r.message; return false; } }).pay(req, s.execute);
+  assert.deepEqual([d.outcome, d.reason, s.seen.length], ['held', 'human_declined', 0]);
+  assert.ok(d.holds.some((h) => h.check === 'contract'), JSON.stringify(d.holds));
+  assert.ok(shown.includes('Full recipient address: 0x4200000000000000000000000000000000000006'));
+});
+
+test('Base: two RPCs disagreeing about contract code hold the payment', async () => {
+  const { req } = baseQuote('Q_base_payee');
+  const svc = realService([{ evm: ['0x', '0x6080604052'] }], 'M2'), s = signer();
+  const d = await createGuard({ url: URL, agent: 'payroll-agent', signedMandate: svc.signed, fetch: svc.fetch }).pay(req, s.execute);
+  assert.deepEqual([d.outcome, d.reason, s.seen.length], ['held', 'no_human', 0]);
+  assert.ok(d.holds.some((h) => h.check === 'contract' && h.status === 'error'));
 });

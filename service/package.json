@@ -9,6 +9,7 @@
   "scripts": {
     "engine": "cd ../engine && cargo build --release --target wasm32-wasip1",
     "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\"",
+    "check-rpcs": "node --no-warnings=ExperimentalWarning scripts/check-rpcs.ts",
     "start": "node --no-warnings=ExperimentalWarning src/server.ts"
   },
   "dependencies": {

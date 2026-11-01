@@ -185,3 +185,10 @@ Read from OutLayer's public source (`out-layer/outlayer` at `aaf60a2`, `out-laye
 - Module input: `op_canonical`, `approval_id`, `wallet_pubkey`, mandate. It computes `request_hash` itself, evaluates the op, then signs `reject` on REFUSED and abstains otherwise. The owner approves alone (threshold 1).
 - Consequence: a compromised Readback key can only veto, never approve. Strict mode (threshold 2, Readback must also approve CLEARED ops) is an option the owner can choose, with that risk stated.
 - Open for the build: the exact keystore contract id used as the vote recipient, and whether module signing keys can sign NEP-413 with an arbitrary recipient (docs say NEP-413 is supported).
+
+## 14. Supported destinations (2026-11-01)
+
+- **Payouts:** Solana, Ethereum, Base and Arbitrum. A mandate whose `dest_chain` is anything else is refused with `unsupported_chain`, rather than held on every payment for want of chain facts. The engine still recognises all 17 EVM chains' address format, which is how it catches a valid address on the wrong chain (T5).
+- **RPCs:** two independent public RPCs per chain, each verified to report the expected chain id by `service/scripts/check-rpcs.ts`. By 1 Nov, `near.lava.build` and `polygon-rpc.com` had been discontinued, so a dead RPC is a real failure mode; any pair can be replaced with `READBACK_RPC_<CHAIN>`.
+- **Sentence:** a saved payee is named with a short address ("Dana, payroll (0xF412…6128)"). Any other recipient is shown in full: live runs on all three EVM chains showed an address-poisoning lookalike and the real payee shorten to the same `0xF4…6128`.
+- **1Click behaviour, observed 2026-11-01:** quotes to WETH as recipient now fail with 400 on Ethereum, Base and Arbitrum (Base accepted WETH on 25 Oct, fixture `Q_base_weth`). Other contract recipients (Uniswap V2 router address) are still quoted, and Readback flags them.

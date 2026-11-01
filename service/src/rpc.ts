@@ -9,17 +9,20 @@ function pair(chain: string, dflt: [string, string]): [string, string] {
   return urls.length === 2 ? [urls[0], urls[1]] : dflt;
 }
 
-/** Two independent public RPCs per chain. Chains not listed get no answers, so contract/mint checks HOLD. */
-export const EVM_RPCS: Record<string, [string, string]> = Object.fromEntries(Object.entries({
-  eth: ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'],
-  base: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'],
-  arb: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'],
-  op: ['https://mainnet.optimism.io', 'https://optimism-rpc.publicnode.com'],
-  pol: ['https://polygon.drpc.org', 'https://polygon-bor-rpc.publicnode.com'],
-  bsc: ['https://bsc-dataseed.bnbchain.org', 'https://bsc-rpc.publicnode.com'],
-  avax: ['https://api.avax.network/ext/bc/C/rpc', 'https://avalanche-c-chain-rpc.publicnode.com'],
-  gnosis: ['https://rpc.gnosischain.com', 'https://gnosis-rpc.publicnode.com'],
-} as Record<string, [string, string]>).map(([c, d]) => [c, pair(c, d)]));
+/**
+ * The EVM chains Readback pays out on, each with two independent public RPCs and the chain id they must
+ * report (scripts/check-rpcs.ts verifies both). The engine still knows every EVM address format, which is
+ * how it catches a valid address on the wrong chain; it just only clears payments to these.
+ */
+export const EVM_CHAINS: Record<string, { id: number; rpcs: [string, string] }> = {
+  eth: { id: 1, rpcs: ['https://ethereum-rpc.publicnode.com', 'https://eth.drpc.org'] },
+  base: { id: 8453, rpcs: ['https://mainnet.base.org', 'https://base-rpc.publicnode.com'] },
+  arb: { id: 42161, rpcs: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'] },
+};
+/** Payment destinations Readback supports. A mandate for any other chain is refused outright. */
+export const DEST_CHAINS = ['sol', ...Object.keys(EVM_CHAINS)];
+/** Two RPCs per EVM chain, after any READBACK_RPC_<CHAIN> override. */
+export const EVM_RPCS: Record<string, [string, string]> = Object.fromEntries(Object.entries(EVM_CHAINS).map(([c, d]) => [c, pair(c, d.rpcs)]));
 export const SOL_RPCS = pair('sol', ['https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com']);
 export const NEAR_RPCS = pair('near', ['https://free.rpc.fastnear.com', 'https://near.drpc.org']);
 

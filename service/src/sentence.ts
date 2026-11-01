@@ -8,9 +8,19 @@ export interface Part { text: string; checks?: string[]; status?: CheckStatus }
 export interface Sentence { text: string; parts: Part[] }
 
 const RANK: Record<CheckStatus, number> = { ok: 0, warn: 1, error: 2, bad: 3 };
-const short = (a: string) => (a.length > 16 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
+const short = (a: string) => (/^0x[0-9a-f]{40}$/i.test(a) ? `${a.slice(0, 6)}…${a.slice(-4)}` : a.length > 16 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
+const sameAddress = (a: string, b: string) => (a.startsWith('0x') ? a.toLowerCase() === b.toLowerCase() : a === b);
 
-export function buildSentence(agent: string, quote: any, intent: any, out: EngineOutput, tokens: TokenMap): Sentence {
+/**
+ * A saved payee is named, with a short address. Anyone else gets the full address: address poisoning copies
+ * the first and last characters, so a short form of an unknown address proves nothing.
+ */
+function recipientText(recipient: string, payees: Array<{ label: string; address: string }>, payeeOk: boolean): string {
+  const saved = payeeOk ? payees.find((p) => sameAddress(recipient, p.address)) : undefined;
+  return saved ? `${saved.label} (${short(recipient)})` : recipient;
+}
+
+export function buildSentence(agent: string, quote: any, intent: any, out: EngineOutput, tokens: TokenMap, payees: Array<{ label: string; address: string }> = []): Sentence {
   const req = quote?.quoteRequest ?? {}, q = quote?.quote ?? {};
   const word = (text: string, checks: string[]): Part => {
     const worst = checks.map((c) => out.c?.[c]).filter((s): s is CheckStatus => !!s).sort((a, b) => RANK[b] - RANK[a])[0];
@@ -25,7 +35,7 @@ export function buildSentence(agent: string, quote: any, intent: any, out: Engin
     { text: from ? ` from ${chainName(from.blockchain)}` : '' },
     ...(sameAsset || !to ? [] : [{ text: ' into ' }, word(to.symbol, ['route'])]),
     { text: ' to ' },
-    word(short(String(req.recipient ?? '')), ['payee', 'lookalike', 'format', 'curve', 'contract', 'mint', 'tag']),
+    word(recipientText(String(req.recipient ?? ''), payees, out.c?.payee === 'ok'), ['payee', 'lookalike', 'format', 'curve', 'contract', 'mint', 'tag']),
     { text: ' on ' },
     word(to ? chainName(to.blockchain) : String(req.destinationAsset ?? ''), ['route']),
     { text: ', with any refund going to ' },

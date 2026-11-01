@@ -11,9 +11,7 @@ Status: in development for NEAR HACKATHON (1 to 14 November 2026). Tracks: secur
 - `docs/THREAT-MODEL.md`: what can go wrong with Readback itself, and how it is handled.
 - `research/`: the experiments behind the spec, with reproducible scripts.
 - `engine/`: the check engine in Rust. All 16 checks; passes all 51 test vectors; never panics on hostile input; builds to a 190 KB WASI module (`readback-check`: JSON request on stdin, compact verdict on stdout) whose output is identical to the native build on every vector, within OutLayer's default fuel budget.
-
-- `service/`: the guard API in Node. It checks the owner's signed mandate (NEP-413, signed by the owner with a full-access key, confirmed on two NEAR RPCs), fetches live chain facts from two independent RPCs per chain, runs the WASI engine and returns the verdict with the plain sentence. Any RPC that is down or disagrees gives HOLD or REFUSED, never CLEARED.
-
+- `service/`: the guard API in Node. Payouts to Solana, Ethereum, Base and Arbitrum. It checks the owner's signed mandate (NEP-413, signed by the owner with a full-access key, confirmed on two NEAR RPCs), fetches live chain facts from two independent RPCs per chain, runs the WASI engine and returns the verdict with the plain sentence. Any RPC that is down or disagrees gives HOLD or REFUSED, never CLEARED.
 - `agent/`: the agent-side guard, the only path from an agent to its signer. REFUSED never reaches the signer. HOLD asks a human, who sees the sentence, the full recipient address, the reasons and the request hash; only an explicit yes counts, and Readback looks again before anything is signed. The signer gets a frozen copy of exactly what was checked. An answer that is not about this exact request and mandate (`request_hash`, `mandate_fingerprint`), does not add up, or does not arrive at all counts as REFUSED.
 
 The app is being built in this repository during the hackathon.
@@ -30,7 +28,7 @@ cargo test                      # see: 51 of 51 vectors pass, plus unit and robu
 ```
 cd service
 npm install && npm run engine   # the engine module needs Rust with the wasm32-wasip1 target
-npm test                        # see: 13 of 13 pass (all 51 vectors through WASI, mandates, end to end)
+npm test                        # see: 14 of 14 pass (all 51 vectors through WASI, mandates, end to end)
 npm start                       # POST /v1/readback, GET /v1/health on 127.0.0.1:8787
 ```
 
@@ -45,7 +43,7 @@ const decision = await guard.pay({ kind: 'quote', quote }, (checked) => mySigner
 // decision.outcome: executed | refused | held | failed; decision.note is one plain line for the agent's model
 ```
 
-`cd agent && npm test` runs it against the real service (13 of 13 pass, including a man in the middle who swaps the intent Readback sees).
+`cd agent && npm test` runs it against the real service (17 of 17 pass, on Solana and Base, including a man in the middle who swaps the intent Readback sees).
 
 Service settings come from the environment: `PORT`, `HOST`, `READBACK_ORIGINS` (allowed browser origins, comma separated), `READBACK_RECIPIENT` (the NEP-413 recipient mandates are signed for, default `readback.app`), `READBACK_ENGINE` (path to the engine module) and `READBACK_RPC_<CHAIN>` (two comma-separated URLs replacing a chain's default RPC pair, for example `READBACK_RPC_NEAR`).
 

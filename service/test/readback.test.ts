@@ -21,7 +21,7 @@ async function run(quoteName: string, mandateId: 'M1' | 'M2', chain: Parameters<
 test('a clean payment is CLEARED and read back as one sentence', async () => {
   const r = await run('Q_clean', 'M1', { sol: [WALLET, WALLET] });
   assert.equal(r.verdict, 'CLEARED', JSON.stringify(r.checks));
-  assert.equal(r.sentence!.text, 'invoice-bot asks to send 250 USDC from NEAR to 6Uer…CDVZ on Solana, with any refund going to read…near.');
+  assert.equal(r.sentence!.text, 'invoice-bot asks to send 250 USDC from NEAR to Acme (6Uer…CDVZ) on Solana, with any refund going to read…near.');
   assert.ok(r.sentence!.parts.every((p) => !p.status || p.status === 'ok'));
   assert.match(r.engine_sha256, /^[0-9a-f]{64}$/);
   assert.match(r.mandate_fingerprint!, /^[0-9a-f]{64}$/);
@@ -31,7 +31,7 @@ test('a lookalike recipient is REFUSED and the address is the marked word', asyn
   const r = await run('Q_lookalike', 'M1', { sol: [WALLET, WALLET] });
   assert.equal(r.verdict, 'REFUSED');
   const marked = r.sentence!.parts.filter((p) => p.status === 'bad');
-  assert.deepEqual(marked.map((p) => p.text), ['6Uer…6DVZ']);
+  assert.deepEqual(marked.map((p) => p.text), ['6UerpTi2CzrJR4iiMvNAgDxbfFVgxhs9cPPuuKkh6DVZ']);
   assert.ok(marked[0].checks!.includes('lookalike'));
 });
 
@@ -77,4 +77,12 @@ test('without a valid owner mandate nothing is evaluated', async () => {
   const r = await readback({ kind: 'quote', quote, signed_mandate: signed }, { fetch: fakeFetch({ sol: [WALLET, WALLET] }), now: at(quote) });
   assert.equal(r.verdict, 'REFUSED');
   assert.equal(r.reason, 'mandate_bad_signature');
+});
+
+test('a mandate for a chain Readback does not pay out on is refused, not held forever', async () => {
+  resetTokenCache();
+  const quote = load('fixtures/quotes/Q_base_payee.json');
+  const { signed, key } = signMandate({ ...mandateFrom('M2'), dest_chain: 'op' });
+  const r = await readback({ kind: 'quote', quote, signed_mandate: signed }, { fetch: fakeFetch({ nearKeys: { [key.publicKey]: 'FullAccess' } }), now: at(quote) });
+  assert.deepEqual([r.verdict, r.reason], ['REFUSED', 'unsupported_chain']);
 });

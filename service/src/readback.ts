@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { runEngine, engineSha256, type EngineOutput } from './engine.ts';
 import { verifyMandate, fingerprint, canonical, type SignedMandate } from './mandate.ts';
-import { evmCode, solAccount, EVM_RPCS, type Fetch } from './rpc.ts';
+import { evmCode, solAccount, EVM_RPCS, DEST_CHAINS, type Fetch } from './rpc.ts';
 import { tokenList, type TokenMap } from './tokens.ts';
 import { buildSentence, type Sentence } from './sentence.ts';
 
@@ -32,6 +32,7 @@ export async function readback(req: ReadbackRequest, deps: Deps): Promise<Readba
   const signed = await verifyMandate(deps.fetch, req.signed_mandate);
   if (!signed.ok) return { ...base, verdict: 'REFUSED', checks: {}, reason: `mandate_${signed.reason}` };
   const mandate = req.signed_mandate.mandate;
+  if (!DEST_CHAINS.includes(mandate.dest_chain)) return { ...base, verdict: 'REFUSED', checks: {}, reason: 'unsupported_chain' };
 
   let tokens: TokenMap = {};
   try { tokens = await tokenList(deps.fetch); } catch { /* sentence falls back to raw ids; no check depends on it except the EVM token-contract test */ }
@@ -50,6 +51,6 @@ export async function readback(req: ReadbackRequest, deps: Deps): Promise<Readba
   return {
     ...base, verdict: out.v, checks: out.c, why: out.why, err: out.err, quote_hash: out.qh,
     mandate_fingerprint: fingerprint(mandate), facts: rpc,
-    sentence: buildSentence(req.agent ?? mandate.agent, req.quote, req.intent, out, tokens),
+    sentence: buildSentence(req.agent ?? mandate.agent, req.quote, req.intent, out, tokens, mandate.payees),
   };
 }
