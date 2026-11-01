@@ -1,0 +1,13 @@
+{
+  "name": "readback-guard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Agent-side Readback guard: the only path from an agent to its signer. Refuses on REFUSED, asks a human on HOLD",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "exports": { ".": "./src/guard.ts", "./human": "./src/human.ts" },
+  "scripts": {
+    "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\""
+  }
+}

@@ -14,6 +14,8 @@ Status: in development for NEAR HACKATHON (1 to 14 November 2026). Tracks: secur
 
 - `service/`: the guard API in Node. It checks the owner's signed mandate (NEP-413, signed by the owner with a full-access key, confirmed on two NEAR RPCs), fetches live chain facts from two independent RPCs per chain, runs the WASI engine and returns the verdict with the plain sentence. Any RPC that is down or disagrees gives HOLD or REFUSED, never CLEARED.
 
+- `agent/`: the agent-side guard, the only path from an agent to its signer. REFUSED never reaches the signer. HOLD asks a human, who sees the sentence, the full recipient address, the reasons and the request hash; only an explicit yes counts, and Readback looks again before anything is signed. The signer gets a frozen copy of exactly what was checked. An answer that is not about this exact request and mandate (`request_hash`, `mandate_fingerprint`), does not add up, or does not arrive at all counts as REFUSED.
+
 The app is being built in this repository during the hackathon.
 
 ## Try the engine
@@ -32,7 +34,20 @@ npm test                        # see: 13 of 13 pass (all 51 vectors through WAS
 npm start                       # POST /v1/readback, GET /v1/health on 127.0.0.1:8787
 ```
 
-Settings come from the environment: `PORT`, `HOST`, `READBACK_ORIGINS` (allowed browser origins, comma separated), `READBACK_RECIPIENT` (the NEP-413 recipient mandates are signed for, default `readback.app`), `READBACK_ENGINE` (path to the engine module) and `READBACK_RPC_<CHAIN>` (two comma-separated URLs replacing a chain's default RPC pair, for example `READBACK_RPC_NEAR`).
+## Use the guard in an agent
+
+```ts
+import { createGuard } from './agent/src/guard.ts';
+import { terminalHuman } from './agent/src/human.ts';
+
+const guard = createGuard({ url: 'http://127.0.0.1:8787', agent: 'invoice-bot', signedMandate, askHuman: terminalHuman() });
+const decision = await guard.pay({ kind: 'quote', quote }, (checked) => mySigner(checked));
+// decision.outcome: executed | refused | held | failed; decision.note is one plain line for the agent's model
+```
+
+`cd agent && npm test` runs it against the real service (13 of 13 pass, including a man in the middle who swaps the intent Readback sees).
+
+Service settings come from the environment: `PORT`, `HOST`, `READBACK_ORIGINS` (allowed browser origins, comma separated), `READBACK_RECIPIENT` (the NEP-413 recipient mandates are signed for, default `readback.app`), `READBACK_ENGINE` (path to the engine module) and `READBACK_RPC_<CHAIN>` (two comma-separated URLs replacing a chain's default RPC pair, for example `READBACK_RPC_NEAR`).
 
 ## Work before 1 November
 

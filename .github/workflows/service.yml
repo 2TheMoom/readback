@@ -2,9 +2,9 @@ name: service
 
 on:
   push:
-    paths: ["service/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+    paths: ["service/**", "agent/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
   pull_request:
-    paths: ["service/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+    paths: ["service/**", "agent/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
 
 jobs:
   test:
@@ -23,4 +23,7 @@ jobs:
           node-version: 24
       - run: npm ci
       - name: Vectors through WASI, NEP-413 reference, mandates, end to end
+        run: npm test
+      - name: Agent-side guard against the service
+        working-directory: agent
         run: npm test
