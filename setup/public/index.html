@@ -35,14 +35,14 @@
     <div class="row"><button id="preview" class="q" disabled>Show the exact text</button><button id="signm" disabled>Sign it in your wallet</button></div>
     <pre id="mtext" hidden></pre><div class="out" id="mout"></div></section>
 
-  <section class="card" id="s3"><h2><span class="n">3</span>Create the agent account <span class="muted" style="font-weight:400;font-size:13px">one transaction, about 0.06 NEAR</span></h2>
-    <div class="out muted" id="planText">Sign the mandate first: it tells this page which key your wallet uses.</div>
+  <section class="card" id="s3"><h2><span class="n">3</span>Send NEAR to the setup account <span class="muted" style="font-weight:400;font-size:13px">a plain transfer</span></h2>
+    <div class="out muted" id="planText">Sign the mandate first: it names the agent account and the key you keep.</div>
     <pre id="planJson" hidden></pre>
-    <div class="row"><button id="create" disabled>Create it in your wallet</button></div><div class="out" id="cout"></div></section>
+    <div class="row"><button id="create" disabled>Send it from your wallet</button></div><div class="out" id="cout"></div></section>
 
-  <section class="card" id="s4"><h2><span class="n">4</span>Register the agent key in intents.near <span class="muted" style="font-weight:400;font-size:13px">no wallet needed</span></h2>
-    <p class="muted" style="margin:0">This computer uses the temporary key from step 3 to call <code>add_public_key</code> (1 yoctoNEAR), then deletes the temporary key from the agent account and checks it is gone.</p>
-    <div class="row"><button id="register" disabled>Register and delete the temporary key</button></div><div class="out" id="rout"></div></section>
+  <section class="card" id="s4"><h2><span class="n">4</span>Create the agent account <span class="muted" style="font-weight:400;font-size:13px">no wallet needed</span></h2>
+    <p class="muted" style="margin:0">Your wallet rightly refuses to let a page add full-access keys, so this computer does it with the setup account's key: it creates the agent account through the <code>near</code> registrar, adds <b>your wallet key with full access</b> and <b>the agent key for intents.near only</b>, registers the agent key in intents.near, deletes the setup key, and closes the setup account so its remaining NEAR goes back to you.</p>
+    <div class="row"><button id="register" disabled>Create and set it up</button></div><div class="out" id="rout"></div></section>
 
   <section class="card" id="s5"><h2><span class="n">5</span>Fund the agent from Base</h2>
     <p class="muted" style="margin:0">1Click gives you a deposit address on Base. Send USDC to it from your own Base wallet, and it arrives in the agent's balance inside intents.near. If anything fails, 1Click refunds to your address below.</p>
@@ -58,27 +58,32 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const near = (y) => y == null ? 'none' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(4) + ' NEAR';
   const api = async (path, body) => { const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
-  let connector, wallet, owner, ownerPk = null, st = null;
+  let connector, wallet, owner, st = null;
 
   async function boot() {
     const manifest = await (await fetch('/manifest.json')).json();
     connector = new window.NearConnector({ network: 'mainnet', manifest, features: { signMessage: true, signAndSendTransaction: true } });
     connector.on('wallet:signIn', async (e) => { wallet = await connector.wallet(); owner = e.accounts?.[0]?.accountId; await refresh(); });
     connector.on('wallet:signOut', () => { wallet = null; owner = null; $('who').textContent = 'Not connected.'; render(); });
+    // A session restored after a reload does not fire wallet:signIn, so ask for it.
+    try { const w = await connector.wallet(); const a = await w.getAccounts(); if (a?.[0]?.accountId && !owner) { wallet = w; owner = a[0].accountId; await refresh(); } } catch { /* not signed in */ }
   }
   async function refresh() {
     if (!owner) return render();
     try { st = await api('/api/state?owner=' + encodeURIComponent(owner)); } catch (e) { $('who').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; return; }
     const enough = st.owner_near != null && BigInt(st.owner_near) >= BigInt(st.owner_needs);
-    $('who').innerHTML = 'Connected as <b>' + esc(owner) + '</b> with ' + esc(near(st.owner_near)) + (enough ? '' : ' <span class="warn">(step 3 needs about 0.06 NEAR in this account first)</span>') + '<br>Agent account: <code>' + esc(st.spender) + '</code> ' + (st.spender_exists ? '<span class="ok">exists</span>' : '<span class="muted">not created yet</span>') + '<br>Agent key: <code>' + esc(st.agent_public_key) + '</code>';
+    if (st.mandate_saved && !st.spender_exists && !(st.setup_near && BigInt(st.setup_near) >= BigInt(st.setup_needs))) { $('mout').innerHTML = '<span class="ok">Mandate already signed and saved.</span>'; showPlan(); }
+    $('who').innerHTML = 'Connected as <b>' + esc(owner) + '</b> with ' + esc(near(st.owner_near)) + (enough ? '' : ' <span class="warn">(step 3 needs about 0.125 NEAR in this account first)</span>') + '<br>Agent account: <code>' + esc(st.spender) + '</code> ' + (st.spender_exists ? '<span class="ok">exists</span>' : '<span class="muted">not created yet</span>') + '<br>Agent key: <code>' + esc(st.agent_public_key) + '</code>';
     render();
   }
   function render() {
-    const c = !!owner, made = !!st?.spender_exists, reg = st?.agent_check?.registered === true && !st?.temp_key_on_chain;
+    const c = !!owner, made = !!st?.spender_exists, reg = made && st?.agent_check?.registered === true && !st?.temp_key_on_chain && !st?.setup_near;
+    const funded = !!st?.setup_near && BigInt(st.setup_near) >= BigInt(st.setup_needs);
     $('disconnect').disabled = !c; $('connect').disabled = c;
     $('preview').disabled = !c; $('signm').disabled = !c || !$('mtext').dataset.nonce;
-    $('create').disabled = !c || !ownerPk || made || !(st && BigInt(st.owner_near ?? 0) >= BigInt(st.owner_needs));
-    $('register').disabled = !c || !made || reg;
+    $('create').disabled = !c || !st?.mandate_saved || made || funded || !(st && BigInt(st.owner_near ?? 0) + BigInt(st.setup_near ?? 0) >= BigInt(st.owner_needs));
+    $('register').disabled = !c || !st?.mandate_saved || !(funded || made) || reg;
+    if (funded && !made) $('cout').innerHTML = '<span class="ok">The setup account has ' + esc(near(st.setup_near)) + '.</span> Go to step 4.';
     $('fund').disabled = !c || !reg; $('check').disabled = !c || !st?.mandate_saved;
     $('s1').classList.toggle('done', c); $('s2').classList.toggle('done', !!st?.mandate_saved); $('s3').classList.toggle('done', made); $('s4').classList.toggle('done', reg);
     $('s5').classList.toggle('done', !!st?.agent_check && st.agent_check.balance !== '0' && st.agent_check.balance !== 'unavailable');
@@ -100,21 +105,17 @@
     let s; try { s = await wallet.signMessage({ message: t.textContent, recipient: t.dataset.recipient, nonce }); } catch (e) { $('mout').innerHTML = '<span class="bad">Wallet declined: ' + esc(e.message || e) + '</span>'; return; }
     try {
       const r = await api('/api/mandate', { ...s, nonce: t.dataset.nonce });
-      ownerPk = r.owner_public_key; delete t.dataset.nonce;
-      $('mout').innerHTML = '<span class="ok">Signed and saved</span> to <code>' + esc(r.saved) + '</code>' + (r.verified === 'ok' ? '' : ' <span class="muted">(Readback will confirm your key controls the agent account after step 3)</span>');
+      delete t.dataset.nonce;
+      $('mout').innerHTML = '<span class="ok">Signed and saved</span> to <code>' + esc(r.saved) + '</code>' + (r.verified === 'ok' ? '' : ' <span class="muted">(Readback will confirm your key controls the agent account after step 4)</span>');
       showPlan();
     } catch (e) { $('mout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
     await refresh();
   };
   async function showPlan() {
     try {
-      const tx = await api('/api/plan/create', { owner, ownerPublicKey: ownerPk });
-      const [, , own, agent, temp] = tx.actions;
-      $('planText').innerHTML = 'Your wallet will be asked to send <b>one transaction</b> from <code>' + esc(tx.signerId) + '</code> to <code>' + esc(tx.receiverId) + '</code> that:<ul>' +
-        '<li>creates the account and sends it 0.05 NEAR</li>' +
-        '<li>adds <b>your wallet key</b> <code>' + esc(own.params.publicKey) + '</code> with full access, so you keep control</li>' +
-        '<li>adds <b>the agent key</b> <code>' + esc(agent.params.publicKey) + '</code> as a function-call key: only <code>intents.near</code>, only <code>execute_intents</code>, at most 0.25 NEAR of gas</li>' +
-        '<li>adds a <b>temporary key</b> <code>' + esc(temp.params.publicKey) + '</code> with full access, which step 4 uses once and deletes</li></ul>';
+      const tx = await api('/api/plan/fund', { owner });
+      $('planText').innerHTML = 'Your wallet will be asked for <b>one plain transfer of ' + esc(near(tx.actions[0].params.deposit)) + '</b> from <code>' + esc(tx.signerId) + '</code> to the setup account<pre>' + esc(tx.receiverId) + '</pre>' +
+        'It adds no keys and calls no contract. Step 4 uses 0.05 NEAR to open the agent account and returns what is left to you.';
       $('planJson').textContent = JSON.stringify(tx, null, 2); $('planJson').hidden = false; $('planJson').dataset.tx = JSON.stringify(tx);
     } catch (e) { $('planText').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
     render();
@@ -126,7 +127,7 @@
   };
   $('register').onclick = async () => {
     $('rout').textContent = 'Working...';
-    try { const r = await api('/api/register', { owner }); $('rout').innerHTML = '<ul>' + r.steps.map((s) => '<li class="ok">' + esc(s) + '</li>').join('') + '</ul>'; }
+    try { const r = await api('/api/provision', { owner }); $('rout').innerHTML = '<ul>' + r.steps.map((s) => '<li class="ok">' + esc(s) + '</li>').join('') + '</ul>'; }
     catch (e) { $('rout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
     await refresh();
   };

@@ -11,7 +11,7 @@
 
 ## The demo agent's key, and its limits
 
-The agent spends from its own account, `invoice-bot.<owner>.near`, never from the owner's account. Its key is one ed25519 key pair, kept in `~/.readback/agent-key.json` (outside the repository; the agent refuses a key file inside it).
+The agent spends from its own account, `invoice-bot-<owner>.near`, never from the owner's account. Its key is one ed25519 key pair, kept in `~/.readback/agent-key.json` (outside the repository; the agent refuses a key file inside it).
 
 **On NEAR, it is a function-call access key**, scoped to `intents.near` with the method `execute_intents` and a gas allowance. It can never be a full-access key: on every start the agent reads its own key from two NEAR RPCs and refuses to run if it has full access, is scoped to any other contract, or is not registered in `intents.near` (`npm run pay -- --check`). As a function-call key it cannot:
 
@@ -36,14 +36,7 @@ What Readback cannot stop: if the machine running the agent is compromised, the 
 
 ## Setting up the demo agent
 
-These steps are mainnet transactions from the owner's wallet. None of them has been done yet.
-
-1. `npm run pay -- --check` once: it creates the agent key and prints its public key.
-2. From the owner account, one transaction to `invoice-bot.<owner>.near`: create the account, send it about 0.1 NEAR for storage, add the owner's wallet key as a full-access key, and add the agent key as a function-call key (`intents.near`, method `execute_intents`, allowance 0.25 NEAR).
-3. As the agent account, call `intents.near` `add_public_key` with the agent key and 1 yoctoNEAR.
-4. Deposit a few USDC into `intents.near` for the agent account.
-5. Sign a Readback mandate that names the agent account as `spender`, and save it as the file `READBACK_MANDATE_FILE` points to.
-6. `npm run pay -- --check` should now report the key as a function-call key, registered, with the balance.
+Use the setup page in `setup/` (see its README): the owner signs the mandate, sends one plain NEAR transfer, and the page does the rest. The demo agent on mainnet is `invoice-bot-olumi15.near` (set up 1 November 2026): one full-access key held by the owner's wallet, one function-call key for the agent, and only the agent key registered in `intents.near`.
 
 ## Commands
 
