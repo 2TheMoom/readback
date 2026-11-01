@@ -10,8 +10,16 @@ Status: in development for NEAR HACKATHON (1 to 14 November 2026). Tracks: secur
 - `docs/test-vectors/`: 51 acceptance tests built on real, signed 1Click quotes and a real generated intent.
 - `docs/THREAT-MODEL.md`: what can go wrong with Readback itself, and how it is handled.
 - `research/`: the experiments behind the spec, with reproducible scripts.
+- `engine/`: the check engine in Rust. All 16 checks; passes all 51 test vectors; never panics on hostile input; builds to a 190 KB WASI module (`readback-check`: JSON request on stdin, compact verdict on stdout) whose output is identical to the native build on every vector, within OutLayer's default fuel budget.
 
-The engine, service and app are being built in this repository during the hackathon.
+The service and app are being built in this repository during the hackathon.
+
+## Try the engine
+
+```
+cd engine
+cargo test                      # see: 51 of 51 vectors pass, plus unit and robustness tests
+```
 
 ## Work before 1 November
 
