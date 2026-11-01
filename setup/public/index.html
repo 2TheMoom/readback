@@ -16,6 +16,8 @@
   input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;width:100%}
   button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--sheet);cursor:pointer}
   button.q{background:transparent;color:var(--ink)} button:disabled{opacity:.35;cursor:not-allowed}
+  .copy{font-size:12px;font-weight:600;padding:2px 10px;margin-left:6px;vertical-align:1px;background:transparent;color:var(--ink);border-width:1px}
+  .copy.done{color:var(--green);border-color:var(--green)}
   pre{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:12px;overflow-x:auto;font-size:12.5px;white-space:pre-wrap;word-break:break-all;margin:10px 0 0}
   ul{margin:8px 0 0;padding-left:20px} li{margin:2px 0} code{font-size:13px;word-break:break-all}
   .out{margin-top:10px;font-size:14px}
@@ -59,6 +61,13 @@
   const near = (y) => y == null ? 'none' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(4) + ' NEAR';
   const api = async (path, body) => { const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
   let connector, wallet, owner, st = null;
+  const copyBtn = (v, what) => '<button class="copy" data-copy="' + esc(v) + '" aria-label="Copy ' + esc(what) + '">Copy</button>';
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-copy]'); if (!b) return;
+    try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied'; b.classList.add('done'); }
+    catch { b.textContent = 'Select and copy'; }
+    setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1600);
+  });
 
   async function boot() {
     const manifest = await (await fetch('/manifest.json')).json();
@@ -73,7 +82,7 @@
     try { st = await api('/api/state?owner=' + encodeURIComponent(owner)); } catch (e) { $('who').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; return; }
     const enough = st.owner_near != null && BigInt(st.owner_near) >= BigInt(st.owner_needs);
     if (st.mandate_saved && !st.spender_exists && !(st.setup_near && BigInt(st.setup_near) >= BigInt(st.setup_needs))) { $('mout').innerHTML = '<span class="ok">Mandate already signed and saved.</span>'; showPlan(); }
-    $('who').innerHTML = 'Connected as <b>' + esc(owner) + '</b> with ' + esc(near(st.owner_near)) + (enough ? '' : ' <span class="warn">(step 3 needs about 0.125 NEAR in this account first)</span>') + '<br>Agent account: <code>' + esc(st.spender) + '</code> ' + (st.spender_exists ? '<span class="ok">exists</span>' : '<span class="muted">not created yet</span>') + '<br>Agent key: <code>' + esc(st.agent_public_key) + '</code>';
+    $('who').innerHTML = 'Connected as <b>' + esc(owner) + '</b> with ' + esc(near(st.owner_near)) + (enough ? '' : ' <span class="warn">(step 3 needs about 0.125 NEAR in this account first)</span>') + '<br>Agent account: <code>' + esc(st.spender) + '</code>' + copyBtn(st.spender, 'agent account') + ' ' + (st.spender_exists ? '<span class="ok">exists</span>' : '<span class="muted">not created yet</span>') + '<br>Agent key: <code>' + esc(st.agent_public_key) + '</code>' + copyBtn(st.agent_public_key, 'agent key');
     render();
   }
   function render() {
@@ -135,7 +144,7 @@
     const units = /^\d+(\.\d{1,6})?$/.test($('famt').value) ? String(Math.round(Number($('famt').value) * 1e6)) : '';
     try {
       const q = await api('/api/funding', { owner, amountUnits: units, refundAddress: $('frefund').value });
-      $('fout').innerHTML = 'Send exactly <b>' + esc(q.amountIn) + ' USDC on Base</b> to<pre>' + esc(q.depositAddress) + '</pre>before ' + esc(q.deadline) + '. About ' + esc(q.amountOut) + ' USDC will arrive for <code>' + esc(q.recipient) + '</code>. Then run the checks.';
+      $('fout').innerHTML = 'Send exactly <b>' + esc(q.amountIn) + ' USDC on Base</b> to' + copyBtn(q.depositAddress, 'deposit address') + '<pre>' + esc(q.depositAddress) + '</pre>before ' + esc(q.deadline) + '. About ' + esc(q.amountOut) + ' USDC will arrive for <code>' + esc(q.recipient) + '</code>. Then run the checks.';
     } catch (e) { $('fout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
   };
   $('check').onclick = async () => {
