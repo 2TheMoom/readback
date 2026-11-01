@@ -23,7 +23,7 @@ The checks must run inside OutLayer's enclave to produce attested receipts, and 
 
 | Day | Date | Goal | Done when |
 |---|---|---|---|
-| 1 | Sat 1 Nov | Create repo; day-1 probes | We know: real `generate-intent` payload shape; OutLayer approval `op` fields; whether a verifier key can be an approver (Mode B go/no-go) |
+| 1 | Sat 1 Nov | Create repo; day-1 probes | DONE: private repo pushed; generate-intent shape known (25 Oct); OutLayer `op` fields and vote rules read from source; Mode B GO, veto-only (SPEC 13) |
 | 2 | Sun 2 Nov | Decoder for all 13 intent types; quote signature check | Vectors V07-V09, V15-V17 pass |
 | 3 | Mon 3 Nov | Address checks: format, curve, payee, lookalike | V02-V06, V18, V19, V22, V23 pass |
 | 4 | Tue 4 Nov | Amount, slippage, route, refund, timing, fees; verdict rules | V01, V10-V14, V26, V27 pass |
@@ -38,10 +38,16 @@ The checks must run inside OutLayer's enclave to produce attested receipts, and 
 | 13 | Thu 13 Nov | Polish, X demo post (Abu posts), submit after Abu confirms payload | 201 from the submission API |
 | 14 | Fri 14 Nov | Buffer only | |
 
+## Changes after day 1 (2026-11-01)
+
+- **Rules update:** HACKATHON.md Q-001 says work from the 19 Oct announcement counts, so research and spikes are inside the window and may be reused. Snapshot: `docs/rules/HACKATHON-2026-11-01.md`.
+- **The Security track's official example is close to Readback**, so we cover every requirement it lists: an agent-side wrapper that refuses on REFUSED and asks a human on HOLD; a demo agent that signs with a function-call key scoped to one contract, with its limits explained; an attack script where a prompt-injected agent tries to pay a bad address and is stopped, with the log.
+- **Stretch signals from that example:** receiver account age and activity, contract code changed recently, prior interactions between agent and receiver, a shared blocklist with evidence.
+
 ## Rules we keep during the build
 
 - Every commit in the repo is from 1-14 Nov. History is never rewritten.
-- Nothing from `readback-prework/spikes/` is copied in. Docs may be, and are disclosed.
+- Research code (now in `research/`) may be reused; anything reused is noted in the commit.
 - No mainnet transaction, deploy, push, post or submission without Abu's explicit yes.
 - Secrets in environment variables only.
 
