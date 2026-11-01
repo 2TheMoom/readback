@@ -1,0 +1,19 @@
+{
+  "name": "readback-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Readback guard API: gathers live chain facts, verifies the owner's mandate, runs the check engine",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "engine": "cd ../engine && cargo build --release --target wasm32-wasip1",
+    "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\"",
+    "start": "node --no-warnings=ExperimentalWarning src/server.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "1.8.1",
+    "@noble/hashes": "1.7.1",
+    "@scure/base": "1.2.4"
+  }
+}

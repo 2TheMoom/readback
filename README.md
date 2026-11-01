@@ -12,7 +12,9 @@ Status: in development for NEAR HACKATHON (1 to 14 November 2026). Tracks: secur
 - `research/`: the experiments behind the spec, with reproducible scripts.
 - `engine/`: the check engine in Rust. All 16 checks; passes all 51 test vectors; never panics on hostile input; builds to a 190 KB WASI module (`readback-check`: JSON request on stdin, compact verdict on stdout) whose output is identical to the native build on every vector, within OutLayer's default fuel budget.
 
-The service and app are being built in this repository during the hackathon.
+- `service/`: the guard API in Node. It checks the owner's signed mandate (NEP-413, signed by the owner with a full-access key, confirmed on two NEAR RPCs), fetches live chain facts from two independent RPCs per chain, runs the WASI engine and returns the verdict with the plain sentence. Any RPC that is down or disagrees gives HOLD or REFUSED, never CLEARED.
+
+The app is being built in this repository during the hackathon.
 
 ## Try the engine
 
@@ -20,6 +22,17 @@ The service and app are being built in this repository during the hackathon.
 cd engine
 cargo test                      # see: 51 of 51 vectors pass, plus unit and robustness tests
 ```
+
+## Try the service
+
+```
+cd service
+npm install && npm run engine   # the engine module needs Rust with the wasm32-wasip1 target
+npm test                        # see: 13 of 13 pass (all 51 vectors through WASI, mandates, end to end)
+npm start                       # POST /v1/readback, GET /v1/health on 127.0.0.1:8787
+```
+
+Settings come from the environment: `PORT`, `HOST`, `READBACK_ORIGINS` (allowed browser origins, comma separated), `READBACK_RECIPIENT` (the NEP-413 recipient mandates are signed for, default `readback.app`), `READBACK_ENGINE` (path to the engine module) and `READBACK_RPC_<CHAIN>` (two comma-separated URLs replacing a chain's default RPC pair, for example `READBACK_RPC_NEAR`).
 
 ## Work before 1 November
 

@@ -1,0 +1,26 @@
+name: service
+
+on:
+  push:
+    paths: ["service/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+  pull_request:
+    paths: ["service/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: service
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust with the WASI target
+        run: rustup toolchain install stable --profile minimal --target wasm32-wasip1 && rustup default stable
+      - name: Build the engine module the service runs
+        run: npm run engine
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Vectors through WASI, NEP-413 reference, mandates, end to end
+        run: npm test
