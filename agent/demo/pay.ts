@@ -30,5 +30,6 @@ if (args.includes('--check')) process.exit(0);
 const [to, amount] = args.filter((a) => !a.startsWith('--'));
 if (!to || !amount) { console.error('usage: node demo/pay.ts <recipient> <amount> [--live]'); process.exit(2); }
 const d = await agent.pay(to, amount);
-console.log(`\n${d.outcome.toUpperCase()}: ${d.note}`);
+const dry = 'result' in d && (d.result as any)?.dry_run;
+console.log(dry ? `\nDRY RUN, NOT SUBMITTED: Readback allowed it (${(d as any).verdict}) and the agent signed it.${d.note.replace(/^Sent\./, '')}` : `\n${d.outcome.toUpperCase()}: ${d.note}`);
 if ('result' in d && d.result) console.log(JSON.stringify(d.result, null, 2));
