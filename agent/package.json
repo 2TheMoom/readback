@@ -5,9 +5,20 @@
   "type": "module",
   "description": "Agent-side Readback guard: the only path from an agent to its signer. Refuses on REFUSED, asks a human on HOLD",
   "license": "MIT",
-  "engines": { "node": ">=24" },
-  "exports": { ".": "./src/guard.ts", "./human": "./src/human.ts" },
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./src/guard.ts",
+    "./human": "./src/human.ts"
+  },
   "scripts": {
-    "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\""
+    "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\"",
+    "pay": "node --no-warnings=ExperimentalWarning demo/pay.ts"
+  },
+  "dependencies": {
+    "@noble/curves": "1.8.1",
+    "@noble/hashes": "1.7.1",
+    "@scure/base": "1.2.4"
   }
 }

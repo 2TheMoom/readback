@@ -43,7 +43,7 @@ const decision = await guard.pay({ kind: 'quote', quote }, (checked) => mySigner
 // decision.outcome: executed | refused | held | failed; decision.note is one plain line for the agent's model
 ```
 
-`cd agent && npm test` runs it against the real service (17 of 17 pass, on Solana and Base, including a man in the middle who swaps the intent Readback sees).
+`cd agent && npm test` runs it against the real service (25 of 25 pass, on Solana and Base, including a man in the middle who swaps the intent Readback sees, and the demo agent). See `agent/README.md` for the demo agent and the limits of its key.
 
 Service settings come from the environment: `PORT`, `HOST`, `READBACK_ORIGINS` (allowed browser origins, comma separated), `READBACK_RECIPIENT` (the NEP-413 recipient mandates are signed for, default `readback.app`), `READBACK_ENGINE` (path to the engine module) and `READBACK_RPC_<CHAIN>` (two comma-separated URLs replacing a chain's default RPC pair, for example `READBACK_RPC_NEAR`).
 

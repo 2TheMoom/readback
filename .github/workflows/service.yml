@@ -24,6 +24,6 @@ jobs:
       - run: npm ci
       - name: Vectors through WASI, NEP-413 reference, mandates, end to end
         run: npm test
-      - name: Agent-side guard against the service
+      - name: Agent-side guard and demo agent against the service
         working-directory: agent
-        run: npm test
+        run: npm ci && npm test
