@@ -5,3 +5,4 @@ dist/
 .env.*
 *.log
 research/s8-wallet/public/near-connect.bundle.js
+setup/public/near-connect.bundle.js

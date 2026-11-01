@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Readback agent setup</title>
+<style>
+  :root{--bg:#ECEEF2;--sheet:#fff;--ink:#14161B;--muted:#677080;--rule:#D8DCE3;--green:#167A4C;--amber:#9A6A00;--red:#C42F1D;--blue:#1F4FD8;color-scheme:light}
+  @media (prefers-color-scheme:dark){:root{--bg:#0C0E11;--sheet:#15181D;--ink:#ECEEF2;--muted:#8C93A1;--rule:#272C34;--green:#4FC98D;--amber:#E5B54A;--red:#FF7E6B;--blue:#8AA8FF;color-scheme:dark}}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif;padding:32px 16px}
+  main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+  h1{margin:0;font-size:24px} h2{margin:0 0 6px;font-size:17px;display:flex;gap:10px;align-items:center}
+  .card{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:20px}
+  .muted{color:var(--muted)} .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
+  .n{flex:none;width:26px;height:26px;border-radius:50%;border:1.5px solid var(--rule);display:grid;place-items:center;font-size:13px;font-weight:700}
+  .done .n{background:var(--green);border-color:var(--green);color:var(--sheet)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);flex:1 1 220px;min-width:0}
+  input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;width:100%}
+  button{font:inherit;font-weight:700;padding:9px 16px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--sheet);cursor:pointer}
+  button.q{background:transparent;color:var(--ink)} button:disabled{opacity:.35;cursor:not-allowed}
+  pre{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:12px;overflow-x:auto;font-size:12.5px;white-space:pre-wrap;word-break:break-all;margin:10px 0 0}
+  ul{margin:8px 0 0;padding-left:20px} li{margin:2px 0} code{font-size:13px;word-break:break-all}
+  .out{margin-top:10px;font-size:14px}
+</style></head>
+<body><main>
+  <h1>Readback agent setup</h1>
+  <p class="muted">Sets up <b>invoice-bot</b>, a demo agent that pays from its own account through Readback. Every step that signs anything opens your wallet; read what it shows before approving. This page runs on your computer only.</p>
+
+  <section class="card" id="s1"><h2><span class="n">1</span>Connect your wallet</h2>
+    <div class="row"><button id="connect">Connect Meteor</button><button id="disconnect" class="q" disabled>Disconnect</button></div>
+    <div class="out" id="who">Not connected.</div></section>
+
+  <section class="card" id="s2"><h2><span class="n">2</span>Sign the mandate <span class="muted" style="font-weight:400;font-size:13px">a message, not a transaction: free</span></h2>
+    <p class="muted" style="margin:0">What the agent may do. Readback refuses or holds anything else.</p>
+    <div class="row"><label>Payee name<input id="label" value="Abu on Base" maxlength="40"></label><label>Payee address on Base<input id="addr" placeholder="0x..." spellcheck="false"></label></div>
+    <div class="row"><label>Most per payment (USDC)<input id="cap" value="2"></label><label>Valid until (UTC)<input id="until" value="2026-11-30T23:59:59Z"></label></div>
+    <div class="row"><button id="preview" class="q" disabled>Show the exact text</button><button id="signm" disabled>Sign it in your wallet</button></div>
+    <pre id="mtext" hidden></pre><div class="out" id="mout"></div></section>
+
+  <section class="card" id="s3"><h2><span class="n">3</span>Create the agent account <span class="muted" style="font-weight:400;font-size:13px">one transaction, about 0.06 NEAR</span></h2>
+    <div class="out muted" id="planText">Sign the mandate first: it tells this page which key your wallet uses.</div>
+    <pre id="planJson" hidden></pre>
+    <div class="row"><button id="create" disabled>Create it in your wallet</button></div><div class="out" id="cout"></div></section>
+
+  <section class="card" id="s4"><h2><span class="n">4</span>Register the agent key in intents.near <span class="muted" style="font-weight:400;font-size:13px">no wallet needed</span></h2>
+    <p class="muted" style="margin:0">This computer uses the temporary key from step 3 to call <code>add_public_key</code> (1 yoctoNEAR), then deletes the temporary key from the agent account and checks it is gone.</p>
+    <div class="row"><button id="register" disabled>Register and delete the temporary key</button></div><div class="out" id="rout"></div></section>
+
+  <section class="card" id="s5"><h2><span class="n">5</span>Fund the agent from Base</h2>
+    <p class="muted" style="margin:0">1Click gives you a deposit address on Base. Send USDC to it from your own Base wallet, and it arrives in the agent's balance inside intents.near. If anything fails, 1Click refunds to your address below.</p>
+    <div class="row"><label>Amount (USDC)<input id="famt" value="3"></label><label>Your Base address for refunds<input id="frefund" placeholder="0x..." spellcheck="false"></label></div>
+    <div class="row"><button id="fund" class="q" disabled>Get a deposit address</button></div><div class="out" id="fout"></div></section>
+
+  <section class="card" id="s6"><h2><span class="n">6</span>Check everything</h2>
+    <div class="row"><button id="check" class="q" disabled>Run the checks</button></div><div class="out" id="kout"></div></section>
+</main>
+<script src="/near-connect.bundle.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const near = (y) => y == null ? 'none' : (Number(BigInt(y) / 10n ** 18n) / 1e6).toFixed(4) + ' NEAR';
+  const api = async (path, body) => { const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); return j; };
+  let connector, wallet, owner, ownerPk = null, st = null;
+
+  async function boot() {
+    const manifest = await (await fetch('/manifest.json')).json();
+    connector = new window.NearConnector({ network: 'mainnet', manifest, features: { signMessage: true, signAndSendTransaction: true } });
+    connector.on('wallet:signIn', async (e) => { wallet = await connector.wallet(); owner = e.accounts?.[0]?.accountId; await refresh(); });
+    connector.on('wallet:signOut', () => { wallet = null; owner = null; $('who').textContent = 'Not connected.'; render(); });
+  }
+  async function refresh() {
+    if (!owner) return render();
+    try { st = await api('/api/state?owner=' + encodeURIComponent(owner)); } catch (e) { $('who').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; return; }
+    const enough = st.owner_near != null && BigInt(st.owner_near) >= BigInt(st.owner_needs);
+    $('who').innerHTML = 'Connected as <b>' + esc(owner) + '</b> with ' + esc(near(st.owner_near)) + (enough ? '' : ' <span class="warn">(step 3 needs about 0.06 NEAR in this account first)</span>') + '<br>Agent account: <code>' + esc(st.spender) + '</code> ' + (st.spender_exists ? '<span class="ok">exists</span>' : '<span class="muted">not created yet</span>') + '<br>Agent key: <code>' + esc(st.agent_public_key) + '</code>';
+    render();
+  }
+  function render() {
+    const c = !!owner, made = !!st?.spender_exists, reg = st?.agent_check?.registered === true && !st?.temp_key_on_chain;
+    $('disconnect').disabled = !c; $('connect').disabled = c;
+    $('preview').disabled = !c; $('signm').disabled = !c || !$('mtext').dataset.nonce;
+    $('create').disabled = !c || !ownerPk || made || !(st && BigInt(st.owner_near ?? 0) >= BigInt(st.owner_needs));
+    $('register').disabled = !c || !made || reg;
+    $('fund').disabled = !c || !reg; $('check').disabled = !c || !st?.mandate_saved;
+    $('s1').classList.toggle('done', c); $('s2').classList.toggle('done', !!st?.mandate_saved); $('s3').classList.toggle('done', made); $('s4').classList.toggle('done', reg);
+    $('s5').classList.toggle('done', !!st?.agent_check && st.agent_check.balance !== '0' && st.agent_check.balance !== 'unavailable');
+  }
+  $('connect').onclick = () => connector.connect();
+  $('disconnect').onclick = async () => { if (wallet) await connector.disconnect(wallet); };
+
+  $('preview').onclick = async () => {
+    $('mout').textContent = ''; $('mtext').hidden = true;
+    try {
+      const m = await api('/api/mandate/message', { owner, payeeLabel: $('label').value, payeeAddress: $('addr').value, capUsdc: $('cap').value, validUntil: $('until').value });
+      $('mtext').textContent = m.message; $('mtext').hidden = false; $('mtext').dataset.nonce = m.nonce; $('mtext').dataset.recipient = m.recipient;
+      $('mout').innerHTML = '<span class="muted">This is exactly what your wallet will show. Check the payee address character by character.</span>';
+    } catch (e) { $('mout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+    render();
+  };
+  $('signm').onclick = async () => {
+    const t = $('mtext'), nonce = Uint8Array.from(atob(t.dataset.nonce), (c) => c.charCodeAt(0));
+    let s; try { s = await wallet.signMessage({ message: t.textContent, recipient: t.dataset.recipient, nonce }); } catch (e) { $('mout').innerHTML = '<span class="bad">Wallet declined: ' + esc(e.message || e) + '</span>'; return; }
+    try {
+      const r = await api('/api/mandate', { ...s, nonce: t.dataset.nonce });
+      ownerPk = r.owner_public_key; delete t.dataset.nonce;
+      $('mout').innerHTML = '<span class="ok">Signed and saved</span> to <code>' + esc(r.saved) + '</code>' + (r.verified === 'ok' ? '' : ' <span class="muted">(Readback will confirm your key controls the agent account after step 3)</span>');
+      showPlan();
+    } catch (e) { $('mout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+    await refresh();
+  };
+  async function showPlan() {
+    try {
+      const tx = await api('/api/plan/create', { owner, ownerPublicKey: ownerPk });
+      const [, , own, agent, temp] = tx.actions;
+      $('planText').innerHTML = 'Your wallet will be asked to send <b>one transaction</b> from <code>' + esc(tx.signerId) + '</code> to <code>' + esc(tx.receiverId) + '</code> that:<ul>' +
+        '<li>creates the account and sends it 0.05 NEAR</li>' +
+        '<li>adds <b>your wallet key</b> <code>' + esc(own.params.publicKey) + '</code> with full access, so you keep control</li>' +
+        '<li>adds <b>the agent key</b> <code>' + esc(agent.params.publicKey) + '</code> as a function-call key: only <code>intents.near</code>, only <code>execute_intents</code>, at most 0.25 NEAR of gas</li>' +
+        '<li>adds a <b>temporary key</b> <code>' + esc(temp.params.publicKey) + '</code> with full access, which step 4 uses once and deletes</li></ul>';
+      $('planJson').textContent = JSON.stringify(tx, null, 2); $('planJson').hidden = false; $('planJson').dataset.tx = JSON.stringify(tx);
+    } catch (e) { $('planText').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+    render();
+  }
+  $('create').onclick = async () => {
+    try { await wallet.signAndSendTransaction(JSON.parse($('planJson').dataset.tx)); $('cout').innerHTML = '<span class="ok">Sent.</span> Checking the chain...'; }
+    catch (e) { $('cout').innerHTML = '<span class="bad">Wallet declined or failed: ' + esc(e.message || e) + '</span>'; return; }
+    setTimeout(refresh, 3000);
+  };
+  $('register').onclick = async () => {
+    $('rout').textContent = 'Working...';
+    try { const r = await api('/api/register', { owner }); $('rout').innerHTML = '<ul>' + r.steps.map((s) => '<li class="ok">' + esc(s) + '</li>').join('') + '</ul>'; }
+    catch (e) { $('rout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+    await refresh();
+  };
+  $('fund').onclick = async () => {
+    const units = /^\d+(\.\d{1,6})?$/.test($('famt').value) ? String(Math.round(Number($('famt').value) * 1e6)) : '';
+    try {
+      const q = await api('/api/funding', { owner, amountUnits: units, refundAddress: $('frefund').value });
+      $('fout').innerHTML = 'Send exactly <b>' + esc(q.amountIn) + ' USDC on Base</b> to<pre>' + esc(q.depositAddress) + '</pre>before ' + esc(q.deadline) + '. About ' + esc(q.amountOut) + ' USDC will arrive for <code>' + esc(q.recipient) + '</code>. Then run the checks.';
+    } catch (e) { $('fout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+  };
+  $('check').onclick = async () => {
+    try {
+      const r = await api('/api/check', {}); const a = r.agent;
+      const p = typeof a.permission === 'object' ? 'function-call key, only ' + a.permission.receiver_id + ', methods ' + (a.permission.method_names.join(', ') || 'all') : a.permission;
+      $('kout').innerHTML = '<ul><li class="' + (r.mandate === 'ok' ? 'ok' : 'bad') + '">Mandate: ' + esc(r.mandate) + '</li><li class="' + (typeof a.permission === 'object' && a.permission.receiver_id === 'intents.near' ? 'ok' : 'bad') + '">Agent key on NEAR: ' + esc(p) + '</li><li class="' + (a.registered === true ? 'ok' : 'bad') + '">Registered in intents.near: ' + esc(a.registered) + '</li><li>Agent balance: ' + esc(a.balance === 'unavailable' ? a.balance : (Number(a.balance) / 1e6) + ' USDC') + '</li></ul>' + (a.ok && r.mandate === 'ok' ? '<p class="ok"><b>Ready.</b> Try <code>npm run pay -- &lt;payee&gt; 1</code> in agent/ (a dry run).</p>' : '<p class="bad">Not ready: ' + esc(a.problems.join(', ')) + '</p>');
+    } catch (e) { $('kout').innerHTML = '<span class="bad">' + esc(e.message) + '</span>'; }
+  };
+  boot();
+</script>
+</body></html>

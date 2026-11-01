@@ -1,0 +1,24 @@
+{
+  "name": "readback-setup",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Owner-side setup for the Readback demo agent: mandate, agent account, key registration, funding",
+  "license": "MIT",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "bundle": "esbuild entry.js --bundle --format=iife --minify --outfile=public/near-connect.bundle.js",
+    "start": "node --no-warnings=ExperimentalWarning src/server.ts",
+    "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@hot-labs/near-connect": "0.11.4",
+    "@noble/curves": "1.8.1",
+    "@noble/hashes": "1.7.1",
+    "@scure/base": "1.2.4",
+    "near-api-js": "7.4.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

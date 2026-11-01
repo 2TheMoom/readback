@@ -2,9 +2,9 @@ name: service
 
 on:
   push:
-    paths: ["service/**", "agent/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+    paths: ["service/**", "agent/**", "setup/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
   pull_request:
-    paths: ["service/**", "agent/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
+    paths: ["service/**", "agent/**", "setup/**", "engine/**", "docs/test-vectors/**", ".github/workflows/service.yml"]
 
 jobs:
   test:
@@ -26,4 +26,7 @@ jobs:
         run: npm test
       - name: Agent-side guard and demo agent against the service
         working-directory: agent
+        run: npm ci && npm test
+      - name: Setup page builders
+        working-directory: setup
         run: npm ci && npm test
