@@ -13,7 +13,7 @@ const VEC = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 't
 export const load = (rel: string) => JSON.parse(readFileSync(join(VEC, rel), 'utf8'));
 
 /** A mandate built from a fixture mandate plus the display fields the signed message needs. */
-export function mandateFrom(id: 'M1' | 'M2' | 'M3'): Mandate {
+export function mandateFrom(id: 'M1' | 'M2' | 'M3' | 'M4'): Mandate {
   const m = load('fixtures/mandates.json')[id];
   return { ...m, cap_symbol: 'USDC', cap_decimals: 6 };
 }
@@ -36,6 +36,8 @@ export interface FakeChain {
   sol?: Array<{ owner: string; data_len: number } | null | 'down'>;
   /** EVM eth_getCode answers per RPC index */
   evm?: Array<string | 'down'>;
+  /** NEAR view_account answers per RPC index (0 fastnear, 1 drpc): null = no such account */
+  near?: Array<{ code_hash: string } | null | 'down'>;
   tokensDown?: boolean;
 }
 
@@ -46,6 +48,12 @@ export function fakeFetch(chain: FakeChain): typeof fetch {
     const u = String(url);
     if (u.includes('1click.chaindefuser.com/v0/tokens')) return chain.tokensDown ? new Response('down', { status: 503 }) : ok(tokens);
     const body = init?.body ? JSON.parse(init.body) : {};
+    if (body.method === 'query' && body.params.request_type === 'view_account') {
+      const a = chain.near?.[u.includes('drpc') ? 1 : 0];
+      if (a === 'down' || a === undefined) throw new TypeError('fetch failed');
+      if (a === null) return ok({ jsonrpc: '2.0', id: 1, error: { name: 'HANDLER_ERROR', cause: { name: 'UNKNOWN_ACCOUNT', info: {} }, code: -32000, message: 'Server error' } });
+      return ok({ jsonrpc: '2.0', id: 1, result: { amount: '0', code_hash: a.code_hash, storage_usage: 182 } });
+    }
     if (body.method === 'query') {
       const p = chain.nearKeys?.[`${body.params.account_id}:${body.params.public_key}`] ?? chain.nearKeys?.[body.params.public_key] ?? 'missing';
       if (p === 'missing') return ok({ jsonrpc: '2.0', id: 1, result: { error: `access key ${body.params.public_key} does not exist while viewing` } });

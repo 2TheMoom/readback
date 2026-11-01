@@ -20,7 +20,7 @@ export const EVM_CHAINS: Record<string, { id: number; rpcs: [string, string] }> 
   arb: { id: 42161, rpcs: ['https://arb1.arbitrum.io/rpc', 'https://arbitrum-one-rpc.publicnode.com'] },
 };
 /** Payment destinations Readback supports. A mandate for any other chain is refused outright. */
-export const DEST_CHAINS = ['sol', ...Object.keys(EVM_CHAINS)];
+export const DEST_CHAINS = ['near', 'sol', ...Object.keys(EVM_CHAINS)];
 /** Two RPCs per EVM chain, after any READBACK_RPC_<CHAIN> override. */
 export const EVM_RPCS: Record<string, [string, string]> = Object.fromEntries(Object.entries(EVM_CHAINS).map(([c, d]) => [c, pair(c, d.rpcs)]));
 export const SOL_RPCS = pair('sol', ['https://api.mainnet-beta.solana.com', 'https://solana-rpc.publicnode.com']);
@@ -28,12 +28,12 @@ export const NEAR_RPCS = pair('near', ['https://free.rpc.fastnear.com', 'https:/
 
 const TIMEOUT_MS = 6000;
 
-async function jsonRpc(f: Fetch, url: string, method: string, params: unknown): Promise<{ result?: any; error?: string }> {
+async function jsonRpc(f: Fetch, url: string, method: string, params: unknown): Promise<{ result?: any; error?: string; cause?: string }> {
   try {
     const r = await f(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!r.ok) return { error: `http_${r.status}` };
     const j: any = await r.json();
-    if (j.error) return { error: String(j.error.message ?? 'rpc_error').slice(0, 120) };
+    if (j.error) return { error: String(j.error.message ?? 'rpc_error').slice(0, 120), cause: j.error.cause?.name };
     return { result: j.result };
   } catch (e: any) {
     return { error: e?.name === 'TimeoutError' ? 'timeout' : 'unreachable' };
@@ -47,6 +47,19 @@ export async function evmCode(f: Fetch, chain: string, address: string): Promise
   return Promise.all(rpcs.map(async (u) => {
     const r = await jsonRpc(f, u, 'eth_getCode', [address, 'latest']);
     return typeof r.result === 'string' ? r.result : { error: r.error ?? 'bad_result' };
+  }));
+}
+
+/**
+ * NEAR account code hash from both NEAR RPCs: null if the account does not exist. NEAR reports a missing
+ * account as a top-level error whose cause is UNKNOWN_ACCOUNT; every other error stays an error.
+ */
+export async function nearAccount(f: Fetch, accountId: string): Promise<Array<{ code_hash: string } | null | { error: string }>> {
+  return Promise.all(NEAR_RPCS.map(async (u) => {
+    const r = await jsonRpc(f, u, 'query', { request_type: 'view_account', finality: 'final', account_id: accountId });
+    if (r.cause === 'UNKNOWN_ACCOUNT') return null;
+    if (r.error) return { error: r.error };
+    return typeof r.result?.code_hash === 'string' ? { code_hash: r.result.code_hash } : { error: 'bad_result' };
   }));
 }
 

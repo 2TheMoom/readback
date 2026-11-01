@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { runEngine, engineSha256, type EngineOutput } from './engine.ts';
 import { verifyMandate, fingerprint, canonical, type SignedMandate } from './mandate.ts';
-import { evmCode, solAccount, EVM_RPCS, DEST_CHAINS, type Fetch } from './rpc.ts';
+import { evmCode, solAccount, nearAccount, EVM_RPCS, DEST_CHAINS, type Fetch } from './rpc.ts';
 import { tokenList, type TokenMap } from './tokens.ts';
 import { buildSentence, type Sentence } from './sentence.ts';
 
@@ -35,12 +35,13 @@ export async function readback(req: ReadbackRequest, deps: Deps): Promise<Readba
   if (!DEST_CHAINS.includes(mandate.dest_chain)) return { ...base, verdict: 'REFUSED', checks: {}, reason: 'unsupported_chain' };
 
   let tokens: TokenMap = {};
-  try { tokens = await tokenList(deps.fetch); } catch { /* sentence falls back to raw ids; no check depends on it except the EVM token-contract test */ }
+  try { tokens = await tokenList(deps.fetch); } catch { /* sentence falls back to raw ids; no check depends on it except the token-contract test (EVM, NEAR) */ }
   const destAsset = String(req.quote?.quoteRequest?.destinationAsset ?? '');
   const recipient = String(req.quote?.quoteRequest?.recipient ?? '');
 
   const rpc: Record<string, unknown> = {};
   if (mandate.dest_chain === 'sol') rpc.sol_account = await solAccount(deps.fetch, recipient);
+  if (mandate.dest_chain === 'near') rpc.near_account = await nearAccount(deps.fetch, recipient);
   if (EVM_RPCS[mandate.dest_chain]) rpc.evm_code = await evmCode(deps.fetch, mandate.dest_chain, recipient);
 
   const out = runEngine({

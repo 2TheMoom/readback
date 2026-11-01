@@ -35,10 +35,21 @@
    "fixtures/quotes/Q_base_payee.json",
    "fixtures/quotes/Q_base_lookalike.json",
    "fixtures/quotes/Q_base_lower.json",
-   "fixtures/quotes/Q_base_weth.json"
+   "fixtures/quotes/Q_base_weth.json",
+   "fixtures/quotes/Q_near_payee.json",
+   "fixtures/quotes/Q_near_lookalike.json",
+   "fixtures/quotes/Q_near_lookalike2.json",
+   "fixtures/quotes/Q_near_contract.json",
+   "fixtures/quotes/Q_near_offcurve.json",
+   "fixtures/quotes/Q_near_intents_payee.json",
+   "fixtures/quotes/Q_near_intents_missing.json"
   ],
   "intents": [
    "fixtures/intents/I_live.json"
+  ],
+  "rpc": [
+   "fixtures/rpc/base-eth_getCode.json",
+   "fixtures/rpc/near-view_account.json"
   ]
  },
  "mutation_ops": {
@@ -1143,12 +1154,63 @@
   },
   {
    "id": "D19",
-   "title": "NEAR named account",
+   "title": "NEAR named account that exists (view_account answers in the recorded shape)",
    "kind": "destination",
    "chain": "near",
    "address": "acme-payments.near",
    "expect": {
     "verdict": "CLEARED"
+   },
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     {
+      "code_hash": "11111111111111111111111111111111"
+     }
+    ]
+   }
+  },
+  {
+   "id": "D19b",
+   "title": "NEAR named account with no chain facts: never cleared",
+   "kind": "destination",
+   "chain": "near",
+   "address": "acme-payments.near",
+   "expect": {
+    "verdict": "HOLD",
+    "error": [
+     "contract",
+     "curve"
+    ]
+   }
+  },
+  {
+   "id": "D19c",
+   "title": "NEAR recipient is the USDC token contract itself",
+   "kind": "destination",
+   "chain": "near",
+   "address": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+   "token_contract": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "DVJx7F3dHEHJYwpYPwXHu8K9Uo7h4kXFcALucY5oNX8q"
+     },
+     {
+      "code_hash": "DVJx7F3dHEHJYwpYPwXHu8K9Uo7h4kXFcALucY5oNX8q"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "mint"
+    ],
+    "warn": [
+     "contract"
+    ]
    }
   },
   {
@@ -1392,6 +1454,216 @@
      "value": "invoice-bot.readback-prework.near"
     }
    ]
+  },
+  {
+   "id": "N01",
+   "title": "NEAR: pay a saved payee that exists",
+   "kind": "quote",
+   "quote": "Q_near_payee",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:19.779Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     {
+      "code_hash": "11111111111111111111111111111111"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "CLEARED"
+   }
+  },
+  {
+   "id": "N02",
+   "title": "NEAR: lookalike name, one letter changed (alise.near), real account",
+   "kind": "quote",
+   "quote": "Q_near_lookalike",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:20.673Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     {
+      "code_hash": "11111111111111111111111111111111"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "payee",
+     "lookalike"
+    ]
+   }
+  },
+  {
+   "id": "N03",
+   "title": "NEAR: lookalike name, one letter added (alicee.near), real account",
+   "kind": "quote",
+   "quote": "Q_near_lookalike2",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:21.342Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     {
+      "code_hash": "11111111111111111111111111111111"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "payee",
+     "lookalike"
+    ]
+   }
+  },
+  {
+   "id": "N04",
+   "title": "NEAR: saved payee is a contract account (aurora)",
+   "kind": "quote",
+   "quote": "Q_near_contract",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:21.881Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+     },
+     {
+      "code_hash": "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "HOLD",
+    "warn": [
+     "contract"
+    ]
+   }
+  },
+  {
+   "id": "N05",
+   "title": "NEAR: implicit account off the ed25519 curve (1Click quotes it; nobody can hold the key)",
+   "kind": "quote",
+   "quote": "Q_near_offcurve",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:22.523Z",
+   "rpc": {
+    "near_account": [
+     null,
+     null
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "payee",
+     "curve"
+    ]
+   }
+  },
+  {
+   "id": "N06",
+   "title": "NEAR: saved payee, but INTENTS keeps the money inside intents.near instead of paying out",
+   "kind": "quote",
+   "quote": "Q_near_intents_payee",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:23.088Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     {
+      "code_hash": "11111111111111111111111111111111"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "route"
+    ]
+   }
+  },
+  {
+   "id": "N07",
+   "title": "NEAR: INTENTS to a name that does not exist (anyone could register it later)",
+   "kind": "quote",
+   "quote": "Q_near_intents_missing",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:23.479Z",
+   "rpc": {
+    "near_account": [
+     null,
+     null
+    ]
+   },
+   "expect": {
+    "verdict": "REFUSED",
+    "bad": [
+     "payee",
+     "route",
+     "curve"
+    ]
+   }
+  },
+  {
+   "id": "N08",
+   "title": "NEAR: the two RPCs disagree about the payee account",
+   "kind": "quote",
+   "quote": "Q_near_payee",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:19.779Z",
+   "rpc": {
+    "near_account": [
+     {
+      "code_hash": "11111111111111111111111111111111"
+     },
+     null
+    ]
+   },
+   "expect": {
+    "verdict": "HOLD",
+    "error": [
+     "contract",
+     "curve"
+    ]
+   }
+  },
+  {
+   "id": "N09",
+   "title": "NEAR: both RPCs down",
+   "kind": "quote",
+   "quote": "Q_near_payee",
+   "mandate": "M4",
+   "now": "2026-11-01T13:55:19.779Z",
+   "rpc": {
+    "near_account": [
+     {
+      "error": "timeout"
+     },
+     {
+      "error": "unreachable"
+     }
+    ]
+   },
+   "expect": {
+    "verdict": "HOLD",
+    "error": [
+     "contract",
+     "curve"
+    ]
+   }
   }
  ]
 }

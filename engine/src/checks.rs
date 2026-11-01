@@ -7,6 +7,7 @@
 //! - destination: `chain`, `address`, optional `token_contract`, optional `rpc`
 //! - `rpc.sol_account`: two recorded answers (`null` = no account, `{owner, data_len}`, or `{error}`)
 //! - `rpc.evm_code`: two `eth_getCode` answers (hex string, or `{error}`)
+//! - `rpc.near_account`: two `view_account` answers (`null` = no account, `{code_hash}`, or `{error}`)
 //!
 //! A malformed or missing field never panics: it fails the check that needs it.
 
@@ -183,6 +184,9 @@ fn destination(out: &mut Outcome, chain: &str, addr: &str, rpc: Option<&Value>, 
             out.set("mint", Status::Ok, "");
         }
     }
+    if chain == "near" {
+        near_destination(out, addr, &rpc, token_contract);
+    }
     if chain == "xrp" {
         if address::xrp_x_address(addr) {
             out.set("tag", Status::Bad, "needs_destination_tag");
@@ -190,6 +194,68 @@ fn destination(out: &mut Outcome, chain: &str, addr: &str, rpc: Option<&Value>, 
             out.set("tag", Status::Ok, "");
         }
     }
+}
+
+const NO_CODE: &str = "11111111111111111111111111111111";
+
+/// NEAR recipients. `curve`: someone can hold the key. For a 64-hex implicit account that means the bytes are an
+/// ed25519 point (1Click quotes payouts to off-curve ids too); for a named account it means the account exists,
+/// because a missing name can be registered later by anyone and claim what was sent. `contract`: the account
+/// has code. `mint`: the recipient is the token's own contract.
+fn near_destination(out: &mut Outcome, addr: &str, rpc: &Value, token_contract: Option<&str>) {
+    let implicit = addr.len() == 64 && addr.bytes().all(|c| c.is_ascii_hexdigit());
+    if implicit {
+        let key: Vec<u8> = (0..32).filter_map(|i| u8::from_str_radix(&addr[2 * i..2 * i + 2], 16).ok()).collect();
+        if key.len() == 32 && address::on_curve(&key) {
+            out.set("curve", Status::Ok, "");
+        } else {
+            out.set("curve", Status::Bad, "no_private_key");
+        }
+    }
+    let answers = rpc.get("near_account").and_then(Value::as_array).cloned().unwrap_or_default();
+    match agree(&answers, |v| v.get("error").is_some()) {
+        None => {
+            out.set("contract", Status::Error, "rpc_unavailable_or_disagree");
+            if !implicit {
+                out.set("curve", Status::Error, "rpc_unavailable_or_disagree");
+            }
+        }
+        Some(Value::Null) => {
+            out.set("contract", Status::Ok, "");
+            if !implicit {
+                out.set("curve", Status::Bad, "account_does_not_exist");
+            }
+        }
+        Some(acc) => {
+            if !implicit {
+                out.set("curve", Status::Ok, "");
+            }
+            if s(&acc, "code_hash") == NO_CODE {
+                out.set("contract", Status::Ok, "");
+            } else {
+                out.set("contract", Status::Warn, "contract");
+            }
+        }
+    }
+    if token_contract.is_some_and(|t| t == addr) {
+        out.set("mint", Status::Bad, "token_contract");
+    } else {
+        out.set("mint", Status::Ok, "");
+    }
+}
+
+/// Edit distance, for names that are not hex: "alice.near" and "alise.near" are 1 apart.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let (a, b): (Vec<char>, Vec<char>) = (a.chars().collect(), b.chars().collect());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, ca) in a.iter().enumerate() {
+        let mut cur = vec![i + 1; b.len() + 1];
+        for (j, cb) in b.iter().enumerate() {
+            cur[j + 1] = (prev[j] + usize::from(ca != cb)).min(prev[j + 1] + 1).min(cur[j] + 1);
+        }
+        prev = cur;
+    }
+    prev[b.len()]
 }
 
 /// Exactly two answers that both succeeded and agree; otherwise `None` (treated as error, never ok).
@@ -234,7 +300,12 @@ fn payment(out: &mut Outcome, input: &Value) {
     } else {
         out.set("payee", Status::Bad, "not_a_saved_payee");
     }
+    let hex64 = |x: &str| x.len() == 64 && x.bytes().all(|c| c.is_ascii_hexdigit());
     let looks_like = |p: &str| -> bool {
+        // Every named NEAR account ends in the same suffix, so compare whole names by edit distance instead.
+        if dest_chain == "near" && !hex64(p) && !hex64(recipient) {
+            return edit_distance(p, recipient) <= 2;
+        }
         let (a, b) = (norm(p), norm(recipient));
         let (a, b) = if evm { (a.trim_start_matches("0x").to_string(), b.trim_start_matches("0x").to_string()) } else { (a, b) };
         let (pre, post) = if evm { (4, 4) } else { (4, 3) };
@@ -282,10 +353,14 @@ fn payment(out: &mut Outcome, input: &Value) {
 
     // route and refund
     let route_ok = strings(&m["origin_assets"]).contains(&s(&req, "originAsset")) && strings(&m["destination_assets"]).contains(&s(&req, "destinationAsset"));
-    if route_ok {
-        out.set("route", Status::Ok, "");
-    } else {
+    if !route_ok {
         out.set("route", Status::Bad, "asset_not_allowed");
+    } else if s(&req, "recipientType") != "DESTINATION_CHAIN" {
+        // INTENTS keeps the money inside intents.near under the recipient's name instead of paying it out; for
+        // a NEAR name that does not exist yet, whoever registers the name later gets it.
+        out.set("route", Status::Bad, "not_a_payout");
+    } else {
+        out.set("route", Status::Ok, "");
     }
     if strings(&m["refund_to"]).contains(&s(&req, "refundTo")) {
         out.set("refund", Status::Ok, "");

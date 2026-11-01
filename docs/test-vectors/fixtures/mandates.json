@@ -94,5 +94,40 @@
    "same_value_assets": true
   },
   "spender": "invoice-bot.readback-prework.near"
+ },
+ "M4": {
+  "id": "M4",
+  "agent": "invoice-bot",
+  "owner": "readback-prework.near",
+  "dest_chain": "near",
+  "payees": [
+   {
+    "label": "Alice",
+    "chain": "near",
+    "address": "alice.near"
+   },
+   {
+    "label": "Aurora (a contract)",
+    "chain": "near",
+    "address": "aurora"
+   }
+  ],
+  "origin_assets": [
+   "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+  ],
+  "destination_assets": [
+   "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"
+  ],
+  "cap": "300000000",
+  "max_slippage_bps": 50,
+  "refund_to": [
+   "readback-prework.near"
+  ],
+  "min_review_seconds": 60,
+  "valid_until": "2026-12-31T23:59:59Z",
+  "fees": {
+   "max_pct": 5,
+   "same_value_assets": true
+  }
  }
 }

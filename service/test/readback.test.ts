@@ -86,3 +86,26 @@ test('a mandate for a chain Readback does not pay out on is refused, not held fo
   const r = await readback({ kind: 'quote', quote, signed_mandate: signed }, { fetch: fakeFetch({ nearKeys: { [key.publicKey]: 'FullAccess' } }), now: at(quote) });
   assert.deepEqual([r.verdict, r.reason], ['REFUSED', 'unsupported_chain']);
 });
+
+const WALLET_NEAR = { code_hash: '11111111111111111111111111111111' };
+
+test('NEAR payout to a saved payee that exists is CLEARED and names the payee', async () => {
+  const r = await run('Q_near_payee', 'M4', { near: [WALLET_NEAR, WALLET_NEAR] });
+  assert.equal(r.verdict, 'CLEARED', JSON.stringify(r.checks));
+  assert.match(r.sentence!.text, /send 250 USDC from NEAR to Alice \(alice\.near\) on NEAR/);
+  assert.deepEqual(r.facts, { near_account: [WALLET_NEAR, WALLET_NEAR] });
+});
+
+test('NEAR: a lookalike name, a missing name kept inside intents.near, an off-curve id', async () => {
+  const look = await run('Q_near_lookalike', 'M4', { near: [WALLET_NEAR, WALLET_NEAR] });
+  assert.deepEqual([look.verdict, look.checks.lookalike], ['REFUSED', 'bad']);
+  const missing = await run('Q_near_intents_missing', 'M4', { near: [null, null] });
+  assert.deepEqual([missing.verdict, missing.checks.route, missing.checks.curve, missing.why?.curve], ['REFUSED', 'bad', 'bad', 'account_does_not_exist']);
+  const off = await run('Q_near_offcurve', 'M4', { near: [null, null] });
+  assert.deepEqual([off.verdict, off.checks.curve], ['REFUSED', 'bad']);
+});
+
+test('NEAR: an RPC that is down holds the payment', async () => {
+  const r = await run('Q_near_payee', 'M4', { near: [WALLET_NEAR, 'down'] });
+  assert.deepEqual([r.verdict, r.checks.contract, r.checks.curve], ['HOLD', 'error', 'error']);
+});

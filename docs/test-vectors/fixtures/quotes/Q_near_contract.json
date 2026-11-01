@@ -1,0 +1,37 @@
+{
+ "quote": {
+  "amountIn": "250000000",
+  "amountInFormatted": "250.0",
+  "amountInUsd": "249.991000000000",
+  "minAmountIn": "250000000",
+  "amountOut": "250000000",
+  "amountOutFormatted": "250.0",
+  "amountOutUsd": "249.991000000000",
+  "minAmountOut": "248750000",
+  "timeEstimate": 10,
+  "refundFee": "0",
+  "withdrawFee": "0"
+ },
+ "quoteRequest": {
+  "dry": true,
+  "depositMode": "SIMPLE",
+  "swapType": "EXACT_INPUT",
+  "slippageTolerance": 50,
+  "originAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "depositType": "INTENTS",
+  "destinationAsset": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "amount": "250000000",
+  "refundTo": "readback-prework.near",
+  "refundType": "INTENTS",
+  "recipient": "aurora",
+  "recipientType": "DESTINATION_CHAIN",
+  "deadline": "2026-11-01T14:04:50.906Z",
+  "confidentiality": "public",
+  "quoteWaitingTimeMs": 0,
+  "insured": false,
+  "appFees": []
+ },
+ "signature": "ed25519:3QNxiDPRKCMfRdBH7B22hG4M9aa9FEe8wMnWpscceUWiqRqathKfwYdXUcLMvzAa9aNdJowc7n5WAGujACfUBVpq",
+ "timestamp": "2026-11-01T13:54:51.881Z",
+ "correlationId": "82b15e5f-021f-4c46-8669-55445449c572"
+}

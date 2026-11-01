@@ -1,0 +1,49 @@
+{
+ "recorded": "2026-11-01T13:54:52.981Z",
+ "rpcs": [
+  "https://free.rpc.fastnear.com",
+  "https://near.drpc.org"
+ ],
+ "answers": {
+  "alice.near": [
+   {
+    "code_hash": "11111111111111111111111111111111"
+   },
+   {
+    "code_hash": "11111111111111111111111111111111"
+   }
+  ],
+  "alise.near": [
+   {
+    "code_hash": "11111111111111111111111111111111"
+   },
+   {
+    "code_hash": "11111111111111111111111111111111"
+   }
+  ],
+  "alicee.near": [
+   {
+    "code_hash": "11111111111111111111111111111111"
+   },
+   {
+    "code_hash": "11111111111111111111111111111111"
+   }
+  ],
+  "aurora": [
+   {
+    "code_hash": "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+   },
+   {
+    "code_hash": "HrtBWvCMmVXRLG9vsYAFT7LfJ6mZtCSNTvYnXMF6fwzT"
+   }
+  ],
+  "4d29ef65de4b421b349b12dccbfffc91563d54004ad339be09505306069be341": [
+   null,
+   null
+  ],
+  "nonexistent-xyz-123.near": [
+   null,
+   null
+  ]
+ }
+}
