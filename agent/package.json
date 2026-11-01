@@ -14,7 +14,8 @@
   },
   "scripts": {
     "test": "node --test --no-warnings=ExperimentalWarning \"test/**/*.test.ts\"",
-    "pay": "node --no-warnings=ExperimentalWarning demo/pay.ts"
+    "pay": "node --no-warnings=ExperimentalWarning demo/pay.ts",
+    "attack": "node --no-warnings=ExperimentalWarning demo/attack.ts"
   },
   "dependencies": {
     "@noble/curves": "1.8.1",
