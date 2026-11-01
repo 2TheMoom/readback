@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Rust with the WASI target
-        run: rustup toolchain install stable --profile minimal --target wasm32-wasip1 && rustup default stable
+        run: rustup toolchain install stable --profile minimal --target wasm32-wasip1 --target wasm32-wasip2 && rustup default stable
       - name: Unit, vector and robustness tests
         run: cargo test --locked
       - name: Build the enclave module
@@ -26,3 +26,5 @@ jobs:
           tar -xf wasmtime.tar.xz && echo "$PWD/wasmtime-v25.0.3-x86_64-linux" >> "$GITHUB_PATH"
       - name: WASI module matches native on every vector, within 1e9 fuel
         run: RB_WASM=target/wasm32-wasip1/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
+      - name: WASI P2 module (what OutLayer runs) matches native on every vector
+        run: cargo build --locked --release --target wasm32-wasip2 && RB_WASM=target/wasm32-wasip2/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
