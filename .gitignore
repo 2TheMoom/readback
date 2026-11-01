@@ -1,0 +1,7 @@
+node_modules/
+target/
+dist/
+.env
+.env.*
+*.log
+research/s8-wallet/public/near-connect.bundle.js

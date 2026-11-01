@@ -1,0 +1,11 @@
+{
+ "intent": {
+  "standard": "nep413",
+  "payload": {
+   "message": "{\"deadline\":\"2026-10-28T09:49:29.588Z\",\"intents\":[{\"intent\":\"transfer\",\"receiver_id\":\"c1ffd620684ac7d1528c5fc90055c8044cbffc524c1ca817c3bee4bf601ace92\",\"tokens\":{\"nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1\":\"1000000\"}}],\"signer_id\":\"readback-prework.near\"}",
+   "nonce": "Vij2xgAlKBKzAIVIVpeo4hjFMC/hVSz/rO7BUpFuyiY=",
+   "recipient": "intents.near"
+  }
+ },
+ "correlationId": "22bee5c8-8a2a-4796-9493-63a8aa10c113"
+}

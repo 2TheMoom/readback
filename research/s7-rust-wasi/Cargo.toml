@@ -1,0 +1,24 @@
+# SPIKE 7 (throwaway, pre-hackathon research). Not product code. Never copied into the hackathon repo.
+[package]
+name = "s7-readback-core"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "s7"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = "1"
+sha2 = "0.10"
+bs58 = "0.5"
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+curve25519-dalek = { version = "4", default-features = false, features = ["alloc"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Readback wallet spike</title>
+<style>
+  :root{--bg:#ECEEF2;--sheet:#fff;--ink:#14161B;--muted:#677080;--rule:#D8DCE3;--green:#167A4C;--red:#C42F1D;color-scheme:light}
+  @media (prefers-color-scheme:dark){:root{--bg:#0C0E11;--sheet:#15181D;--ink:#ECEEF2;--muted:#8C93A1;--rule:#272C34;--green:#4FC98D;--red:#FF7E6B;color-scheme:dark}}
+  body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 system-ui,sans-serif;padding:40px 16px}
+  main{max-width:620px;margin:0 auto;background:var(--sheet);border:1px solid var(--rule);border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:16px}
+  h1{margin:0;font-size:24px}.muted{color:var(--muted)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button{font:inherit;font-weight:700;padding:10px 16px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--sheet);cursor:pointer}
+  button.q{background:transparent;color:var(--ink)} button:disabled{opacity:.4;cursor:not-allowed}
+  ol{margin:0;padding-left:20px} li{margin:4px 0} .ok{color:var(--green)} .bad{color:var(--red)}
+  pre{background:var(--bg);border:1px solid var(--rule);border-radius:10px;padding:12px;overflow-x:auto;font-size:12.5px;white-space:pre-wrap;word-break:break-all}
+</style></head>
+<body><main>
+  <h1>Readback wallet spike</h1>
+  <p class="muted">Throwaway local test. Your wallet will be asked to <b>sign a message</b>, not a transaction. No funds move. The local server then verifies the signature and checks the key on chain.</p>
+  <div class="row"><label><input type="radio" name="net" value="mainnet" checked> mainnet</label><label><input type="radio" name="net" value="testnet"> testnet</label></div>
+  <div class="row"><button id="connect">Connect a wallet</button><button id="sign" class="q" disabled>Sign the message</button><button id="out" class="q" disabled>Disconnect</button></div>
+  <div id="who" class="muted">Not connected.</div>
+  <ol id="steps"></ol>
+  <pre id="raw" hidden></pre>
+</main>
+<script src="/near-connect.bundle.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  const net = () => document.querySelector('input[name=net]:checked').value;
+  let connector = null, wallet = null, account = null;
+  function setup() {
+    connector = new window.NearConnector({ network: net(), features: { signMessage: true } });
+    connector.on('wallet:signIn', async (e) => { wallet = await connector.wallet(); account = e.accounts && e.accounts[0] && e.accounts[0].accountId; $('who').textContent = 'Connected: ' + (account || '?') + ' via ' + (wallet.manifest ? wallet.manifest.name : 'wallet') + ' on ' + net(); $('sign').disabled = false; $('out').disabled = false; });
+    connector.on('wallet:signOut', () => { wallet = null; account = null; $('who').textContent = 'Not connected.'; $('sign').disabled = true; $('out').disabled = true; });
+  }
+  document.querySelectorAll('input[name=net]').forEach(r => r.addEventListener('change', setup)); setup();
+  $('connect').onclick = () => connector.connect();
+  $('out').onclick = async () => { if (wallet) await connector.disconnect(wallet); };
+  $('sign').onclick = async () => {
+    $('steps').innerHTML = ''; $('raw').hidden = true;
+    const n = await (await fetch('/nonce', { method: 'POST', body: JSON.stringify({ network: net() }) })).json();
+    const nonceBytes = Uint8Array.from(atob(n.nonce), c => c.charCodeAt(0));
+    let signed;
+    try { signed = await wallet.signMessage({ message: n.message, recipient: n.recipient, nonce: nonceBytes }); }
+    catch (e) { $('steps').innerHTML = '<li class="bad">Wallet declined or failed: ' + String(e && e.message || e).replace(/</g, '&lt;') + '</li>'; return; }
+    $('raw').textContent = 'What the wallet returned:\n' + JSON.stringify(signed, null, 2); $('raw').hidden = false;
+    const v = await (await fetch('/verify', { method: 'POST', body: JSON.stringify({ ...signed, nonce: n.nonce }) })).json();
+    $('steps').innerHTML = v.steps.map(s => '<li class="' + (s.ok ? 'ok' : 'bad') + '">' + (s.ok ? '✓ ' : '✕ ') + s.name.replace(/</g, '&lt;') + (s.detail ? ' <span class="muted">(' + String(s.detail).replace(/</g, '&lt;') + ')</span>' : '') + '</li>').join('');
+  };
+</script>
+</body></html>

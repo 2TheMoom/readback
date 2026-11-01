@@ -1,0 +1,178 @@
+{
+ "intents": [
+  {
+   "name": "add_public_key",
+   "req": [
+    "public_key"
+   ],
+   "opt": []
+  },
+  {
+   "name": "remove_public_key",
+   "req": [
+    "public_key"
+   ],
+   "opt": []
+  },
+  {
+   "name": "transfer",
+   "req": [
+    "receiver_id",
+    "tokens"
+   ],
+   "opt": [
+    "memo",
+    "min_gas",
+    "msg",
+    "state_init"
+   ]
+  },
+  {
+   "name": "ft_withdraw",
+   "req": [
+    "amount",
+    "receiver_id",
+    "token"
+   ],
+   "opt": [
+    "memo",
+    "min_gas",
+    "msg",
+    "storage_deposit"
+   ]
+  },
+  {
+   "name": "nft_withdraw",
+   "req": [
+    "receiver_id",
+    "token",
+    "token_id"
+   ],
+   "opt": [
+    "memo",
+    "min_gas",
+    "msg",
+    "storage_deposit"
+   ]
+  },
+  {
+   "name": "mt_withdraw",
+   "req": [
+    "amounts",
+    "receiver_id",
+    "token",
+    "token_ids"
+   ],
+   "opt": [
+    "memo",
+    "min_gas",
+    "msg",
+    "storage_deposit"
+   ]
+  },
+  {
+   "name": "native_withdraw",
+   "req": [
+    "amount",
+    "receiver_id"
+   ],
+   "opt": []
+  },
+  {
+   "name": "storage_deposit",
+   "req": [
+    "amount",
+    "contract_id",
+    "deposit_for_account_id"
+   ],
+   "opt": []
+  },
+  {
+   "name": "token_diff",
+   "req": [
+    "diff"
+   ],
+   "opt": [
+    "memo",
+    "referral"
+   ]
+  },
+  {
+   "name": "set_auth_by_predecessor_id",
+   "req": [
+    "enabled"
+   ],
+   "opt": []
+  },
+  {
+   "name": "auth_call",
+   "req": [
+    "contract_id",
+    "msg"
+   ],
+   "opt": [
+    "attached_deposit",
+    "min_gas",
+    "state_init"
+   ]
+  },
+  {
+   "name": "imt_mint",
+   "req": [
+    "receiver_id",
+    "tokens"
+   ],
+   "opt": [
+    "memo",
+    "min_gas",
+    "msg",
+    "state_init"
+   ]
+  },
+  {
+   "name": "imt_burn",
+   "req": [
+    "minter_id",
+    "tokens"
+   ],
+   "opt": [
+    "memo"
+   ]
+  }
+ ],
+ "quoteRequestRequired": [
+  "dry",
+  "swapType",
+  "slippageTolerance",
+  "originAsset",
+  "depositType",
+  "destinationAsset",
+  "amount",
+  "refundTo",
+  "refundType",
+  "recipient",
+  "recipientType",
+  "deadline"
+ ],
+ "quoteFields": [
+  "depositAddress",
+  "depositMemo",
+  "chainDepositAddresses",
+  "amountIn",
+  "amountInFormatted",
+  "amountInUsd",
+  "minAmountIn",
+  "amountOut",
+  "amountOutFormatted",
+  "amountOutUsd",
+  "minAmountOut",
+  "deadline",
+  "timeWhenInactive",
+  "timeEstimate",
+  "virtualChainRecipient",
+  "virtualChainRefundRecipient",
+  "customRecipientMsg",
+  "refundFee",
+  "withdrawFee"
+ ]
+}
