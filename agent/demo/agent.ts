@@ -16,6 +16,8 @@ export interface AgentOptions {
   askHuman?: Human;
   live?: boolean;
   fetch?: Fetch;
+  /** Refuse answers the OutLayer enclave did not check (GuardOptions.requireEnclave). */
+  requireEnclave?: boolean;
   /** Fetch used for Readback only (tests run the service in process). Defaults to `fetch`. */
   readbackFetch?: Fetch;
 }
@@ -37,7 +39,7 @@ export async function startAgent(opts: AgentOptions) {
   const check: SelfCheck = await selfCheck(f, spender, opts.key.publicKey, m.origin_assets[0]);
   if (!check.ok) return { ok: false as const, check };
 
-  const guard = createGuard({ url: opts.readbackUrl, agent: m.agent, signedMandate: opts.signedMandate, askHuman: opts.askHuman, fetch: opts.readbackFetch ?? f });
+  const guard = createGuard({ url: opts.readbackUrl, agent: m.agent, signedMandate: opts.signedMandate, askHuman: opts.askHuman, requireEnclave: opts.requireEnclave, fetch: opts.readbackFetch ?? f });
 
   /** The tool the agent's model calls. `amount` is in the mandate's asset, for example "2.5" USDC. */
   async function pay(to: string, amount: string): Promise<PayResult> {

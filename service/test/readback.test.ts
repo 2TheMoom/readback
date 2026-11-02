@@ -4,6 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readback } from '../src/readback.ts';
+import { runEngine } from '../src/engine.ts';
 import { resetTokenCache } from '../src/tokens.ts';
 import { load, mandateFrom, signMandate, fakeFetch, WALLET } from './helpers.ts';
 
@@ -108,4 +109,46 @@ test('NEAR: a lookalike name, a missing name kept inside intents.near, an off-cu
 test('NEAR: an RPC that is down holds the payment', async () => {
   const r = await run('Q_near_payee', 'M4', { near: [WALLET_NEAR, 'down'] });
   assert.deepEqual([r.verdict, r.checks.contract, r.checks.curve], ['HOLD', 'error', 'error']);
+});
+
+async function withEnclave(attest: (input: unknown) => Promise<any>, quoteName = 'Q_clean') {
+  resetTokenCache();
+  const quote = load(`fixtures/quotes/${quoteName}.json`);
+  const { signed, key } = signMandate(mandateFrom('M1'));
+  const f = fakeFetch({ sol: [WALLET, WALLET], nearKeys: { [key.publicKey]: 'FullAccess' } });
+  const seen: unknown[] = [];
+  const r = await readback({ kind: 'quote', agent: 'invoice-bot', quote, signed_mandate: signed }, { fetch: f, now: at(quote), attest: async (i) => { seen.push(i); return attest(i); } });
+  return { r, seen };
+}
+const RECEIPT = { call_id: 'c', task_id: 1, project_id: 'readback.near/readback', wasm_sha256: 'w', input_hash: 'i', output_hash: 'o', task_hash: 't', worker_measurement: 'm', attestation_url: 'u', verify: 'v' };
+
+test('enclave: a verified receipt with the same output keeps CLEARED and carries the receipt', async () => {
+  const { r, seen } = await withEnclave(async (input) => ({ ok: true, output: runEngine(input), receipt: RECEIPT }));
+  assert.equal(r.verdict, 'CLEARED', JSON.stringify(r.checks));
+  assert.equal(r.checks.enclave, 'ok');
+  assert.deepEqual(r.receipt, RECEIPT);
+  assert.equal(seen.length, 1);
+  assert.equal((seen[0] as any).quote.quote.depositAddress, (load('fixtures/quotes/Q_clean.json') as any).quote.depositAddress);
+});
+
+test('enclave: no verified receipt holds a payment that would clear', async () => {
+  const { r } = await withEnclave(async () => ({ ok: false, reason: 'quote_not_bound_to_task' }));
+  assert.equal(r.verdict, 'HOLD');
+  assert.equal(r.checks.enclave, 'error');
+  assert.equal(r.why!.enclave, 'quote_not_bound_to_task');
+  assert.equal(r.receipt, undefined);
+});
+
+test('enclave: an enclave output that differs from the local engine is REFUSED', async () => {
+  const { r } = await withEnclave(async (input) => ({ ok: true, output: { ...runEngine(input), qh: 'other' }, receipt: RECEIPT }));
+  assert.equal(r.verdict, 'REFUSED');
+  assert.equal(r.checks.enclave, 'bad');
+  assert.equal(r.why!.enclave, 'enclave_disagrees');
+  assert.equal(r.receipt, undefined);
+});
+
+test('enclave: a REFUSED payment stays REFUSED when the enclave agrees', async () => {
+  const { r } = await withEnclave(async (input) => ({ ok: true, output: runEngine(input), receipt: RECEIPT }), 'Q_lookalike');
+  assert.equal(r.verdict, 'REFUSED');
+  assert.equal(r.checks.enclave, 'ok');
 });

@@ -5,20 +5,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGuard, type Human } from '../src/guard.ts';
 import { readback } from '../../service/src/readback.ts';
+import { runEngine } from '../../service/src/engine.ts';
 import { load, mandateFrom, signMandate, fakeFetch, WALLET, type FakeChain } from '../../service/test/helpers.ts';
 
 const MINT = { owner: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA', data_len: 82 };
 const URL = 'http://guard.test';
 
 /** The real service, answering through fetch. Call i uses chains[i] (the last one repeats). */
-function realService(chains: FakeChain[], mandateId: 'M1' | 'M2' = 'M1') {
+function realService(chains: FakeChain[], mandateId: 'M1' | 'M2' = 'M1', attest?: (input: unknown) => Promise<any>) {
   const { signed, key } = signMandate(mandateFrom(mandateId));
   let calls = 0;
   const f = (async (_url: any, init: any) => {
     const body = JSON.parse(init.body);
     const chain = chains[Math.min(calls++, chains.length - 1)];
     const now = () => new Date(Date.parse(body.quote.timestamp) + 30_000);
-    const r = await readback(body, { fetch: fakeFetch({ ...chain, nearKeys: { [key.publicKey]: 'FullAccess' } }), now });
+    const r = await readback(body, { fetch: fakeFetch({ ...chain, nearKeys: { [key.publicKey]: 'FullAccess' } }), now, attest });
     return new Response(JSON.stringify(r), { status: 200 });
   }) as typeof fetch;
   return { signed, fetch: f, calls: () => calls };
@@ -235,4 +236,44 @@ test('Base: two RPCs disagreeing about contract code hold the payment', async ()
   const d = await createGuard({ url: URL, agent: 'payroll-agent', signedMandate: svc.signed, fetch: svc.fetch }).pay(req, s.execute);
   assert.deepEqual([d.outcome, d.reason, s.seen.length], ['held', 'no_human', 0]);
   assert.ok(d.holds.some((h) => h.check === 'contract' && h.status === 'error'));
+});
+
+const RECEIPT = { call_id: 'c1', task_id: 1239282, project_id: 'readback.near/readback', wasm_sha256: '89a2', verify: 'outlayer-verify job 1239282 --network mainnet' };
+const enclaveAgrees = async (input: unknown) => ({ ok: true, output: runEngine(input), receipt: RECEIPT });
+
+test('requireEnclave: an answer the enclave did not check is refused before the signer', async () => {
+  const svc = realService([{ sol: [WALLET, WALLET] }]), s = signer();
+  const g = createGuard({ url: URL, agent: 'invoice-bot', signedMandate: svc.signed, fetch: svc.fetch, requireEnclave: true });
+  const d = await g.pay(quote(), s.execute);
+  assert.equal(d.outcome, 'refused');
+  assert.equal(d.reason, 'enclave_not_checked');
+  assert.equal(s.seen.length, 0);
+});
+
+test('requireEnclave: a CLEARED answer with a receipt runs the signer and hands the receipt back', async () => {
+  const svc = realService([{ sol: [WALLET, WALLET] }], 'M1', enclaveAgrees), s = signer();
+  const g = createGuard({ url: URL, agent: 'invoice-bot', signedMandate: svc.signed, fetch: svc.fetch, requireEnclave: true });
+  const d = await g.pay(quote(), s.execute);
+  assert.equal(d.outcome, 'executed', d.note);
+  assert.equal(d.receipt?.task_id, RECEIPT.task_id);
+  assert.equal(s.seen.length, 1);
+});
+
+test('requireEnclave: no receipt from the enclave holds the payment', async () => {
+  const svc = realService([{ sol: [WALLET, WALLET] }], 'M1', async () => ({ ok: false, reason: 'attestation_unavailable' })), s = signer();
+  const g = createGuard({ url: URL, agent: 'invoice-bot', signedMandate: svc.signed, fetch: svc.fetch, requireEnclave: true });
+  const d = await g.pay(quote(), s.execute);
+  assert.equal(d.outcome, 'held');
+  assert.deepEqual(d.holds, [{ check: 'enclave', status: 'error', why: 'attestation_unavailable' }]);
+  assert.equal(s.seen.length, 0);
+});
+
+test('requireEnclave: a CLEARED answer whose receipt was stripped on the way is refused', async () => {
+  const svc = realService([{ sol: [WALLET, WALLET] }], 'M1', enclaveAgrees), s = signer();
+  const strip = (async (u: any, i: any) => { const r: any = await (await svc.fetch(u, i)).json(); delete r.receipt; return new Response(JSON.stringify(r)); }) as typeof fetch;
+  const g = createGuard({ url: URL, agent: 'invoice-bot', signedMandate: svc.signed, fetch: strip, requireEnclave: true });
+  const d = await g.pay(quote(), s.execute);
+  assert.equal(d.outcome, 'refused');
+  assert.equal(d.reason, 'no_receipt');
+  assert.equal(s.seen.length, 0);
 });

@@ -7,14 +7,26 @@ import { verifyMandate, fingerprint, canonical, type SignedMandate } from './man
 import { evmCode, solAccount, nearAccount, EVM_RPCS, DEST_CHAINS, type Fetch } from './rpc.ts';
 import { tokenList, type TokenMap } from './tokens.ts';
 import { buildSentence, type Sentence } from './sentence.ts';
+import type { Attested, Receipt } from './outlayer.ts';
 
 export interface ReadbackRequest { kind: 'quote' | 'intent'; agent?: string; quote: any; intent?: any; signed_mandate: SignedMandate }
 export interface ReadbackResponse extends Partial<EngineOutput> {
   verdict: EngineOutput['v'] | 'REFUSED'; checks: EngineOutput['c']; sentence?: Sentence;
   evaluated_at: string; engine_sha256: string; request_hash?: string; mandate_fingerprint?: string; quote_hash?: string; facts?: unknown; reason?: string;
+  receipt?: Receipt;
 }
 
-export interface Deps { fetch: Fetch; now?: () => Date }
+/**
+ * `attest` reruns the engine input in OutLayer's TEE (src/outlayer.ts). When set, the answer gets one more
+ * check, `enclave`: ok with a verified receipt and identical output, error (HOLD) when there is no verified
+ * receipt, bad (REFUSED) when the enclave's output differs from the local engine's.
+ */
+export interface Deps { fetch: Fetch; now?: () => Date; attest?: (input: unknown) => Promise<Attested> }
+
+function verdictOf(c: EngineOutput['c']): EngineOutput['v'] {
+  const s = Object.values(c);
+  return s.includes('bad') ? 'REFUSED' : s.some((x) => x === 'warn' || x === 'error') ? 'HOLD' : 'CLEARED';
+}
 
 /** Binds a verdict to the exact request. The agent-side guard recomputes it and refuses any answer that differs. */
 export function requestHash(req: ReadbackRequest): string {
@@ -44,14 +56,24 @@ export async function readback(req: ReadbackRequest, deps: Deps): Promise<Readba
   if (mandate.dest_chain === 'near') rpc.near_account = await nearAccount(deps.fetch, recipient);
   if (EVM_RPCS[mandate.dest_chain]) rpc.evm_code = await evmCode(deps.fetch, mandate.dest_chain, recipient);
 
-  const out = runEngine({
+  const input = {
     kind: req.kind, now: now.toISOString(), mandate, quote: req.quote, intent: req.intent ?? null,
     tokens: tokens[destAsset] ? { [destAsset]: { contractAddress: tokens[destAsset].contractAddress ?? null } } : {},
     rpc,
-  });
+  };
+  const out = runEngine(input);
+  let receipt: Receipt | undefined;
+  if (deps.attest && !out.err) {
+    const a = await deps.attest(input);
+    const [status, why] = !a.ok ? ['error', a.reason] as const : canonical(a.output) !== canonical(out) ? ['bad', 'enclave_disagrees'] as const : ['ok', null] as const;
+    out.c = { ...out.c, enclave: status };
+    if (why) out.why = { ...out.why, enclave: why };
+    if (a.ok && status === 'ok') receipt = a.receipt;
+    out.v = verdictOf(out.c);
+  }
   return {
     ...base, verdict: out.v, checks: out.c, why: out.why, err: out.err, quote_hash: out.qh,
-    mandate_fingerprint: fingerprint(mandate), facts: rpc,
+    mandate_fingerprint: fingerprint(mandate), facts: rpc, ...(receipt ? { receipt } : {}),
     sentence: buildSentence(req.agent ?? mandate.agent, req.quote, req.intent, out, tokens, mandate.payees),
   };
 }

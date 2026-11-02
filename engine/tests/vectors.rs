@@ -130,6 +130,25 @@ fn wasm_module_matches_native() {
     println!("{checked} vectors: WASI output identical to native, each within 1e9 fuel");
 }
 
+/// Writes each vector's exact engine input (`<id>.in.json`) and native output (`<id>.out.json`) to RB_DUMP_DIR,
+/// so other runners (the OutLayer enclave, via service/scripts/attest-vectors.ts) can be fed byte-identical requests.
+#[test]
+fn dump_inputs() {
+    let Ok(dir) = std::env::var("RB_DUMP_DIR") else {
+        eprintln!("skipped: set RB_DUMP_DIR to write the engine inputs");
+        return;
+    };
+    let doc = load("vectors.json");
+    let (mandates, tokens, base_code) = (load("fixtures/mandates.json"), load("fixtures/tokens.json"), load("fixtures/rpc/base-eth_getCode.json"));
+    fs::create_dir_all(&dir).unwrap();
+    for v in doc["vectors"].as_array().unwrap() {
+        let id = v["id"].as_str().unwrap();
+        let input = build_input(v, &mandates, &tokens, &base_code).to_string();
+        fs::write(PathBuf::from(&dir).join(format!("{id}.in.json")), &input).unwrap();
+        fs::write(PathBuf::from(&dir).join(format!("{id}.out.json")), readback_engine::evaluate_str(&input)).unwrap();
+    }
+}
+
 #[test]
 fn output_fits_outlayer_limit() {
     let doc = load("vectors.json");

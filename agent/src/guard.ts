@@ -23,6 +23,8 @@ export interface GuardOptions {
   askHuman?: Human;
   /** Accepted engine_sha256 values. Empty accepts any engine. */
   engines?: string[];
+  /** Refuse any answer the OutLayer enclave did not check, and a CLEARED one without a receipt. */
+  requireEnclave?: boolean;
   fetch?: typeof fetch;
   timeoutMs?: number;
   humanTimeoutMs?: number;
@@ -39,9 +41,13 @@ export interface Decision<T = unknown> {
   note: string;
   result?: T;
   error?: string;
+  /** The OutLayer TEE receipt, when Readback ran the check there (verify with receipt.verify). */
+  receipt?: Receipt;
 }
 
-interface Checked { verdict: Verdict; reason: string; sentence?: string; holds: Hold[]; quote_hash?: string }
+export interface Receipt { call_id: string; task_id: number; project_id: string; wasm_sha256: string; verify: string; [k: string]: unknown }
+
+interface Checked { verdict: Verdict; reason: string; sentence?: string; holds: Hold[]; quote_hash?: string; receipt?: Receipt }
 
 /** Recursive key-sorted compact JSON, the same canonical form the service hashes. */
 export function canonical(v: unknown): string {
@@ -120,7 +126,10 @@ export function createGuard(opts: GuardOptions) {
     const statuses = Object.values(checks);
     if (r.verdict === 'CLEARED' && (statuses.length === 0 || holds.length > 0)) return refused('inconsistent_answer');
     if (r.verdict === 'HOLD' && (holds.length === 0 || statuses.includes('bad'))) return refused('inconsistent_answer');
-    return { verdict: r.verdict, reason: r.verdict === 'CLEARED' ? 'cleared' : 'held', sentence, holds, quote_hash: r.quote_hash };
+    const receipt = r.receipt && typeof r.receipt === 'object' && Number.isInteger(r.receipt.task_id) && typeof r.receipt.verify === 'string' ? r.receipt as Receipt : undefined;
+    if (opts.requireEnclave && !('enclave' in checks)) return refused('enclave_not_checked');
+    if (opts.requireEnclave && r.verdict === 'CLEARED' && (checks.enclave !== 'ok' || !receipt)) return refused('no_receipt');
+    return { verdict: r.verdict, reason: r.verdict === 'CLEARED' ? 'cleared' : 'held', sentence, holds, quote_hash: r.quote_hash, receipt };
   }
 
   /**
@@ -133,7 +142,7 @@ export function createGuard(opts: GuardOptions) {
     catch { req = { kind: 'quote', quote: null }; }
     const hash = requestHash(opts.agent, req, mandate);
     const done = (c: Checked, outcome: Decision['outcome'], reason = c.reason, extra: Partial<Decision<T>> = {}): Decision<T> => ({
-      outcome, verdict: c.verdict, reason, sentence: c.sentence, request_hash: hash, holds: c.holds, note: note(outcome, c, reason), ...extra,
+      outcome, verdict: c.verdict, reason, sentence: c.sentence, request_hash: hash, holds: c.holds, note: note(outcome, c, reason), ...(c.receipt ? { receipt: c.receipt } : {}), ...extra,
     });
 
     const first = await check(req, hash);
