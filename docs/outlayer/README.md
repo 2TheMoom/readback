@@ -35,17 +35,28 @@ verdicts differ. An agent can insist on it: `createGuard({ ..., requireEnclave: 
 enclave did not check, and a CLEARED one without a receipt (`READBACK_REQUIRE_ENCLAVE=1` for the demo agent).
 
 What this service does not check itself: the quote's Intel signature chain, and whether the worker measurement
-is an approved OutLayer build. OutLayer's own verifier does both from the task id in the receipt:
+is an approved OutLayer build. OutLayer's own verifier ([out-layer/outlayer-verify](https://github.com/out-layer/outlayer-verify))
+does both, from the task id in the receipt:
 
 ```sh
-outlayer-verify job <task_id> --network mainnet
+cargo install --git https://github.com/out-layer/outlayer-verify --rev 90c27d9d4fc843194ddc6f8ebaafa4eb320c3bb6 --locked outlayer-verify
+outlayer-verify job <task_id> --api https://api.outlayer.ai --input <request.json> --output <response.json>
 ```
+
+`--api` is needed with that version: its built-in default (api.outlayer.fastnear.com) now answers 410.
 
 ## Evidence
 
 - [attested-vectors.json](attested-vectors.json): all 65 test vectors run in the enclave on mainnet, 2026-11-02.
   65 of 65 receipts verified, 65 of 65 outputs byte-identical to the native engine (11 CLEARED, 16 HOLD,
   38 REFUSED). Each row has its task id for `outlayer-verify`. Cost: $0.069.
+- [verified-vectors.txt](verified-vectors.txt): the same 65 tasks through `outlayer-verify`, 2026-11-03.
+  **65 of 65 PROVEN**: Intel signature chain valid (all eight checks, TCB UpToDate), worker measurements approved
+  on chain by `worker.outlayer.near`, and each quote bound to that vector's exact input and output. To rerun one,
+  write the inputs with `cd engine && RB_DUMP_DIR=vec cargo test --test vectors dump_inputs`, then
+  `outlayer-verify job <task> --api https://api.outlayer.ai --input vec/<id>.in.json --output vec/<id>.out.json`.
+- [bundles/V01-task-1239345.json](bundles/V01-task-1239345.json): a self-contained evidence bundle (record,
+  Intel collateral, payloads) that re-verifies with no network: `outlayer-verify bundle <file> --offline`.
 - `service/test/fixtures/outlayer-V01.json`: one real record, used by the tests to show that every edited field,
   a swapped quote, a different module, input or output is caught.
 - Live demo agent, dry run with the enclave required: 1 USDC to the saved payee CLEARED, checked in task
