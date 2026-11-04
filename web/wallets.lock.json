@@ -1,18 +1,12 @@
 {
  "source": "https://raw.githubusercontent.com/hot-dao/near-selector/refs/heads/main/repository/manifest.json",
- "pinned": "2026-11-04T02:54:03.135Z",
+ "pinned": "2026-11-04T02:57:46.095Z",
  "wallets": [
   {
    "id": "meteor-wallet",
    "source": "https://raw.githubusercontent.com/Meteor-Wallet/meteor_wallet_sdk/data-storage/storage/meteor-near-connect-latest.js",
    "sha256": "96210256a89cb382bb7fe95f29d6a2489319da87472fe77018b4cdcbf1672b50",
    "bytes": 2003753
-  },
-  {
-   "id": "mynearwallet",
-   "source": "https://raw.githubusercontent.com/hot-dao/near-selector/refs/heads/main/repository/mnw.js",
-   "sha256": "428055aeb7ea018f2e041babf0bfeb33fcf1f0a69b7865e9887a17b9e6f559ca",
-   "bytes": 1219902
   }
  ],
  "manifest": {
@@ -56,33 +50,6 @@
      "external": [
       "meteorCom",
       "meteorComV2"
-     ]
-    }
-   },
-   {
-    "id": "mynearwallet",
-    "name": "MyNearWallet",
-    "icon": "https://storage.herewallet.app/upload/d0544304123d10518af961a15d5722ff1cef7abf62155f830e6d733e41f7da4b.png",
-    "description": "Web wallet for NEAR.",
-    "website": "https://mynearwallet.com",
-    "version": "1.0.0",
-    "executor": "https://raw.githubusercontent.com/hot-dao/near-selector/refs/heads/main/repository/mnw.js",
-    "type": "sandbox",
-    "platform": {
-     "web": "https://app.mynearwallet.com"
-    },
-    "features": {
-     "signMessage": true,
-     "signInWithoutAddKey": true,
-     "signInAndSignMessage": true,
-     "signInWithFunctionCallKey": true,
-     "signAndSendTransaction": true,
-     "signAndSendTransactions": true
-    },
-    "permissions": {
-     "storage": true,
-     "allowsOpen": [
-      "https://app.mynearwallet.com"
      ]
     }
    }

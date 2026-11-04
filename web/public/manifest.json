@@ -41,33 +41,6 @@
      "meteorComV2"
     ]
    }
-  },
-  {
-   "id": "mynearwallet",
-   "name": "MyNearWallet",
-   "icon": "https://storage.herewallet.app/upload/d0544304123d10518af961a15d5722ff1cef7abf62155f830e6d733e41f7da4b.png",
-   "description": "Web wallet for NEAR.",
-   "website": "https://mynearwallet.com",
-   "version": "1.0.0+428055aeb7ea",
-   "executor": "/wallets/mynearwallet.js",
-   "type": "sandbox",
-   "platform": {
-    "web": "https://app.mynearwallet.com"
-   },
-   "features": {
-    "signMessage": true,
-    "signInWithoutAddKey": true,
-    "signInAndSignMessage": true,
-    "signInWithFunctionCallKey": true,
-    "signAndSendTransaction": true,
-    "signAndSendTransactions": true
-   },
-   "permissions": {
-    "storage": true,
-    "allowsOpen": [
-     "https://app.mynearwallet.com"
-    ]
-   }
   }
  ]
 }
