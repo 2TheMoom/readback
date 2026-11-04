@@ -15,10 +15,11 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SOURCE = 'https://raw.githubusercontent.com/hot-dao/near-selector/refs/heads/main/repository/manifest.json';
-/** Meteor, tested end to end. MyNearWallet was dropped on 2026-11-04: it is in limited mode, "sending, staking and
+/** Meteor, tested end to end, and Intear (web wallet, a 14 KB executor read in full: it talks only to
+ * wallet.intear.tech and its logout bridge). MyNearWallet was dropped on 2026-11-04: it is in limited mode, "sending, staking and
  * app approvals have ended", though near-connect still lists it. Each wallet offered is code trusted on the
  * approval page and needs its own live test. */
-const OFFER = ['meteor-wallet'];
+const OFFER = ['meteor-wallet', 'intear-wallet'];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUB = join(HERE, '..', 'public');
