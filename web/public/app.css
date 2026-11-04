@@ -376,3 +376,6 @@ select.blank{cursor:pointer}
 @media (max-width:860px){.arow{grid-template-columns:minmax(0,1fr) auto;gap:6px 16px}.arow .desc{grid-column:1/-1}}
 .backlink{display:none}
 @media (prefers-reduced-motion:reduce){.tk,.btn,.tog .tr,.tog .tr::after{transition:none}}
+/* A sentence inside a narrow card: notes go under it, not in a margin column that squeezes it to one word a line. */
+.answer .rb{grid-template-columns:minmax(0,1fr);gap:16px}
+.answer .notes{border-left:0;padding-left:0;border-top:1.5px solid var(--rule);padding-top:14px}
