@@ -59,3 +59,9 @@ test('runAttested returns the receipt, and fails closed on every missing piece',
   const down = (async () => { throw new TypeError('fetch failed'); }) as typeof fetch;
   assert.deepEqual(await runAttested(down, fx.input, { key: 'k' }), { ok: false, reason: 'call_unreachable' });
 });
+
+test('a new check accepts only the current build: a receipt from the earlier module is refused', () => {
+  const old = JSON.parse(readFileSync(new URL('../../docs/outlayer/bundles/V01-task-1239345.json', import.meta.url), 'utf8')).attestation;
+  assert.equal(old.wasm_hash, '89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69');
+  assert.equal(checkAttestation({ ...old, executed_wasm_sha256: old.wasm_hash }, sent, fx.output), 'wrong_module');
+});

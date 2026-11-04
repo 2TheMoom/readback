@@ -8,14 +8,25 @@ receipt that anyone can check: this exact module turned this exact input into th
 | | |
 |---|---|
 | Project | `readback.near/readback` |
-| Module | `engine/target/wasm32-wasip2/release/readback-check.wasm`, 214,015 bytes |
-| sha256 | `89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69` |
-| Source | https://main.fastfs.io/readback.near/outlayer.near/89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69.wasm |
+| Module | `readback-check.wasm` (WASI preview 2), 213,935 bytes, version 2 of the project |
+| sha256 | `75f315e7875765a3169c74cbcc3bae9daacca1eb8fdc9052795188340723d7fd` |
+| Source | https://main.fastfs.io/readback.near/outlayer.near/75f315e7875765a3169c74cbcc3bae9daacca1eb8fdc9052795188340723d7fd.wasm |
 | Owner | `readback.near` (created by `setup/scripts/deployer.ts`) |
 
-Rebuild and compare: `cd engine && cargo build --locked --release --target wasm32-wasip2 && sha256sum target/wasm32-wasip2/release/readback-check.wasm`.
-The build reproduces this hash, and CI checks that the module gives byte-identical output to the native engine on
-every test vector.
+Rebuild and compare, from the repository root:
+
+```sh
+docker run --rm -v "$PWD:/src" -w /src/engine rust:1.97.1-slim-bookworm sh -c 'rustup target add wasm32-wasip2 && cargo build --locked --release --target wasm32-wasip2 --target-dir /tmp/canonical && sha256sum /tmp/canonical/wasm32-wasip2/release/readback-check.wasm'
+```
+
+This gives the hash above, byte for byte, on any machine: the module embeds the paths of the Rust package cache,
+and inside the official image those paths are the same everywhere. CI builds it this way on every push, checks the
+hash, and checks that the module gives byte-identical output to the native engine on every test vector.
+
+The first deployed build, `89a21ea9…5d69` (2 November 2026), was built with plain `cargo build` on Windows and
+embedded that machine's paths, so nobody else could rebuild it. CI caught that on 4 November and this build replaced
+it. Receipts from it still verify (the Verify page and `outlayer-verify` accept both); its evidence is in the
+`*-89a21ea9*` files below.
 
 ## How a verdict gets its receipt
 
@@ -47,16 +58,19 @@ outlayer-verify job <task_id> --api https://api.outlayer.ai --input <request.jso
 
 ## Evidence
 
-- [attested-vectors.json](attested-vectors.json): all 65 test vectors run in the enclave on mainnet, 2026-11-02.
+- [attested-vectors.json](attested-vectors.json): all 65 test vectors run in the enclave on the current build, 2026-11-04.
   65 of 65 receipts verified, 65 of 65 outputs byte-identical to the native engine (11 CLEARED, 16 HOLD,
-  38 REFUSED). Each row has its task id for `outlayer-verify`. Cost: $0.069.
-- [verified-vectors.txt](verified-vectors.txt): the same 65 tasks through `outlayer-verify`, 2026-11-03.
+  38 REFUSED). Each row has its task id for `outlayer-verify`. About $0.07 per run of all 65.
+- [verified-vectors.txt](verified-vectors.txt): the same 65 tasks through `outlayer-verify`, 2026-11-04.
   **65 of 65 PROVEN**: Intel signature chain valid (all eight checks, TCB UpToDate), worker measurements approved
   on chain by `worker.outlayer.near`, and each quote bound to that vector's exact input and output. To rerun one,
   write the inputs with `cd engine && RB_DUMP_DIR=vec cargo test --test vectors dump_inputs`, then
   `outlayer-verify job <task> --api https://api.outlayer.ai --input vec/<id>.in.json --output vec/<id>.out.json`.
-- [bundles/V01-task-1239345.json](bundles/V01-task-1239345.json): a self-contained evidence bundle (record,
+- [bundles/V01-task-1265467.json](bundles/V01-task-1265467.json): a self-contained evidence bundle (record,
   Intel collateral, payloads) that re-verifies with no network: `outlayer-verify bundle <file> --offline`.
+- Earlier build `89a21ea9`: [attested-vectors-89a21ea9.json](attested-vectors-89a21ea9.json),
+  [verified-vectors-89a21ea9.txt](verified-vectors-89a21ea9.txt) (65 of 65 PROVEN, 2026-11-03) and
+  [bundles/V01-task-1239345.json](bundles/V01-task-1239345.json).
 - `service/test/fixtures/outlayer-V01.json`: one real record, used by the tests to show that every edited field,
   a swapped quote, a different module, input or output is caught.
 - Live demo agent, dry run with the enclave required: 1 USDC to the saved payee CLEARED, checked in task

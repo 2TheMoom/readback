@@ -21,7 +21,7 @@ RUN cd service && npm ci --omit=dev --no-audit --no-fund
 COPY service/src service/src
 COPY agent/src agent/src
 COPY docs/test-vectors docs/test-vectors
-COPY docs/outlayer/attested-vectors.json docs/outlayer/attested-vectors.json
+COPY docs/outlayer/attested-vectors*.json docs/outlayer/
 COPY --from=engine /src/engine/target/wasm32-wasip1/release/readback-check.wasm engine/target/wasm32-wasip1/release/readback-check.wasm
 COPY --from=web /src/web/public web/public
 ENV NODE_ENV=production HOST=0.0.0.0 READBACK_TRUST_PROXY=1 READBACK_DATA_DIR=/data

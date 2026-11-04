@@ -19,7 +19,13 @@ import type { EngineOutput } from './engine.ts';
 export const OUTLAYER_API = 'https://api.outlayer.ai';
 /** The project and the build it must run: engine/target/wasm32-wasip2/release/readback-check.wasm. */
 export const OUTLAYER_PROJECT = process.env.READBACK_OUTLAYER_PROJECT ?? 'readback.near/readback';
-export const OUTLAYER_WASM_SHA256 = process.env.READBACK_OUTLAYER_WASM ?? '89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69';
+export const OUTLAYER_WASM_SHA256 = process.env.READBACK_OUTLAYER_WASM ?? '75f315e7875765a3169c74cbcc3bae9daacca1eb8fdc9052795188340723d7fd';
+/**
+ * Every build that has run as readback.near/readback, newest first, so an older receipt can still be checked.
+ * 89a21ea9 was built on Windows and carries that machine's paths; 75f315e7 is built in rust:1.97.1-slim-bookworm
+ * and anyone can rebuild it byte for byte (README). New checks accept only the current build.
+ */
+export const KNOWN_BUILDS = [OUTLAYER_WASM_SHA256, '89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69'];
 
 export interface Receipt {
   call_id: string; task_id: number; project_id: string; wasm_sha256: string;

@@ -33,6 +33,8 @@ jobs:
         run: |
           docker run --rm -v "$PWD:/src" -w /src/engine rust:1.97.1-slim-bookworm sh -c 'rustup target add wasm32-wasip2 && cargo build --locked --release --target wasm32-wasip2 --target-dir /tmp/canonical && cp /tmp/canonical/wasm32-wasip2/release/readback-check.wasm /src/readback-check.canonical.wasm'
           sha256sum readback-check.canonical.wasm
+          # The module deployed to OutLayer as readback.near/readback. A change to the engine changes this on purpose.
+          test "$(sha256sum readback-check.canonical.wasm | cut -d" " -f1)" = 75f315e7875765a3169c74cbcc3bae9daacca1eb8fdc9052795188340723d7fd
       - uses: actions/upload-artifact@v4
         with:
           name: readback-check-canonical

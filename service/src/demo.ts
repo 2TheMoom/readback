@@ -3,13 +3,13 @@
 // any Readback attestation by task id, and for a vector's task re-derive its exact input and output.
 
 import { createHash } from 'node:crypto';
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { runEngine, type EngineOutput } from './engine.ts';
 import { canonical } from './mandate.ts';
 import { vector, engineInput, engineInputBytes, vectorSentence } from './vectors.ts';
-import { taskHash, quoteFields, OUTLAYER_API, OUTLAYER_PROJECT, OUTLAYER_WASM_SHA256, type Attested, type Receipt } from './outlayer.ts';
+import { taskHash, quoteFields, OUTLAYER_API, OUTLAYER_PROJECT, KNOWN_BUILDS, type Attested, type Receipt } from './outlayer.ts';
 import type { Fetch } from './rpc.ts';
 
 export const CASES = [
@@ -91,12 +91,16 @@ export function createDemo(o: { attest?: (input: unknown) => Promise<Attested>; 
   return { run, summary, cases: CASES };
 }
 
-/** Task ids of the 65 attested vectors, so Verify can re-derive their exact input and output. */
+/** Task ids of the attested vector runs (every build), so Verify can re-derive their exact input and output. */
 function vectorTasks(): Map<number, string> {
+  const tasks = new Map<number, string>();
+  const dir = new URL('../../docs/outlayer/', import.meta.url);
   try {
-    const d = JSON.parse(readFileSync(new URL('../../docs/outlayer/attested-vectors.json', import.meta.url), 'utf8'));
-    return new Map(d.rows.map((r: any) => [r.task_id, r.id]));
-  } catch { return new Map(); }
+    for (const f of readdirSync(dir).filter((n) => /^attested-vectors.*\.json$/.test(n))) {
+      for (const r of JSON.parse(readFileSync(new URL(f, dir), 'utf8')).rows) tasks.set(r.task_id, r.id);
+    }
+  } catch { /* no evidence files: Verify still checks the record itself */ }
+  return tasks;
 }
 
 export interface VerifyStep { id: string; label: string; ok: boolean | null; detail: string }
@@ -117,7 +121,7 @@ export async function verifyTask(f: Fetch, task: number): Promise<{ task: number
     { id: 'project', label: 'It ran the Readback project', ok: a.project_id === OUTLAYER_PROJECT, detail: String(a.project_id) },
     // wasm_hash is inside the task hash the quote commits to; executed_wasm_sha256 is only the API's word, so it
     // must agree when present but cannot stand in for the bound field.
-    { id: 'module', label: 'The module is the pinned build', ok: a.wasm_hash === OUTLAYER_WASM_SHA256 && (a.executed_wasm_sha256 === undefined || a.executed_wasm_sha256 === OUTLAYER_WASM_SHA256), detail: `sha256:${a.wasm_hash}` },
+    { id: 'module', label: 'The module is a published Readback build', ok: KNOWN_BUILDS.includes(a.wasm_hash) && (a.executed_wasm_sha256 === undefined || a.executed_wasm_sha256 === a.wasm_hash), detail: `sha256:${a.wasm_hash}${a.wasm_hash === KNOWN_BUILDS[0] ? ' (current build)' : KNOWN_BUILDS.includes(a.wasm_hash) ? ' (earlier build)' : ''}` },
     { id: 'binding', label: 'The TDX quote commits to exactly these fields', ok: !!q && q.report_data.startsWith(th) && /^0{64}$/.test(q.report_data.slice(64)), detail: `task hash ${th}` },
     { id: 'measurement', label: 'The quote names the worker the record names', ok: !!q && q.rtmr3 === a.worker_measurement, detail: `RTMR3 ${String(a.worker_measurement).slice(0, 24)}…` },
   ];
