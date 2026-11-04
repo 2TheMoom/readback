@@ -28,7 +28,12 @@ jobs:
         run: RB_WASM=target/wasm32-wasip1/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
       - name: WASI P2 module (what OutLayer runs) matches native on every vector
         run: cargo build --locked --release --target wasm32-wasip2 && RB_WASM=target/wasm32-wasip2/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
-      - name: The P2 module is the one deployed to OutLayer, byte for byte
+      - name: Canonical P2 build (what OutLayer runs), inside the official Rust image so paths, and so bytes, are the same everywhere
+        working-directory: .
         run: |
-          sha256sum target/wasm32-wasip2/release/readback-check.wasm
-          test "$(sha256sum target/wasm32-wasip2/release/readback-check.wasm | cut -d" " -f1)" = 89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69
+          docker run --rm -v "$PWD:/src" -w /src/engine rust:1.97.1-slim-bookworm sh -c 'rustup target add wasm32-wasip2 && cargo build --locked --release --target wasm32-wasip2 --target-dir /tmp/canonical && cp /tmp/canonical/wasm32-wasip2/release/readback-check.wasm /src/readback-check.canonical.wasm'
+          sha256sum readback-check.canonical.wasm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readback-check-canonical
+          path: readback-check.canonical.wasm
