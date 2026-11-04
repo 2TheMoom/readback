@@ -5,6 +5,8 @@
 // node demo/attack.ts            scripted stand-in model if no NEAR AI key is configured, else NEAR AI Cloud
 // node demo/attack.ts --scripted always the scripted stand-in
 // node demo/attack.ts --live     also submit what Readback clears (the genuine invoice): spends real USDC
+// node demo/attack.ts --web      a HOLD waits for the owner in the Readback web app instead of being declined
+// node demo/attack.ts --only inflated-amount   one scenario (genuine, poisoned-address, processing-fee, inflated-amount)
 //
 // NEAR AI key: one line NEARAI_API_KEY=... in ~/.readback/llm.env (optional NEARAI_MODEL=...). Never printed.
 
@@ -139,10 +141,18 @@ async function main() {
 
   const mandateFile = process.env.READBACK_MANDATE_FILE ?? join(homedir(), '.readback', 'mandate.json');
   if (!existsSync(mandateFile)) { console.error(`No signed mandate at ${mandateFile}.`); process.exit(2); }
+  const signedMandate = JSON.parse(readFileSync(mandateFile, 'utf8'));
+  const readbackUrl = process.env.READBACK_URL ?? 'http://127.0.0.1:8787';
+  const only = args.includes('--only') ? args[args.indexOf('--only') + 1] : null;
+  const scenarios = only ? SCENARIOS.filter((s) => s.id === only) : SCENARIOS;
+  if (!scenarios.length) { console.error(`No scenario ${only}. Ids: ${SCENARIOS.map((s) => s.id).join(', ')}`); process.exit(2); }
+  const { webHuman } = await import('../src/approval.ts');
   const agent = await startAgent({
-    key: loadOrCreateKey(), signedMandate: JSON.parse(readFileSync(mandateFile, 'utf8')), readbackUrl: process.env.READBACK_URL ?? 'http://127.0.0.1:8787', live,
-    // Nobody is watching this run: a HOLD reaches an absent owner and is declined.
-    askHuman: async () => false,
+    key: loadOrCreateKey(), signedMandate, readbackUrl, live,
+    // With --web a HOLD waits for the owner in the web app. Without it nobody is watching, so a HOLD is declined.
+    askHuman: args.includes('--web')
+      ? webHuman({ url: readbackUrl, signedMandate, onPosted: (_id, link) => console.log(`  Held for the owner. Approve or refuse it at ${link}`) })
+      : async () => false,
   });
   if (!agent.ok) { console.error(`Agent refuses to run: ${agent.check.problems.join(', ')}`); process.exit(1); }
 
@@ -152,7 +162,7 @@ async function main() {
   const jsonl = join(dir, `attack-${stamp}.jsonl`);
   const steps: Step[] = [];
   const log = (x: Step) => { steps.push(x); appendFileSync(jsonl, JSON.stringify(x) + '\n'); const d: any = x.data;
-    if (x.kind === 'email') console.log(`\n=== ${d.title}`);
+    if (x.kind === 'email') console.log(`\n=== ${d.title}\n${String(d.email).split('\n').map((l) => `  | ${l}`).join('\n')}`);
     if (x.kind === 'model_call') console.log(`  model calls ${x.data.tool}(${JSON.stringify(d.args)})`);
     if (x.kind === 'readback') console.log(`  Readback ${d.verdict ?? d.outcome} (${d.reason}); signed: ${d.signed ? 'yes' : 'no'}; submitted: ${d.submitted ? d.intent_hash : 'no'}`);
     if (x.kind === 'model_reply') console.log(`  model: ${String(d.text).slice(0, 160)}`);
@@ -160,7 +170,7 @@ async function main() {
 
   console.log(`Model: ${model.name}\nMode: ${live ? 'LIVE (cleared payments are submitted)' : 'dry run (nothing is submitted)'}`);
   const verdicts = [];
-  for (const s of SCENARIOS) { const r = await runScenario(s, model, agent.pay, log); verdicts.push({ s, ...judged(s, r.payments, r.modelError) }); }
+  for (const s of scenarios) { const r = await runScenario(s, model, agent.pay, log); verdicts.push({ s, ...judged(s, r.payments, r.modelError) }); }
   const md = transcript(model.name, live ? 'live' : 'dry run', steps, verdicts);
   writeFileSync(jsonl.replace(/\.jsonl$/, '.md'), md);
   console.log(`\n${verdicts.map((v) => `${v.ok ? 'ok ' : 'BAD'} ${v.s.title}: ${v.why}`).join('\n')}\n\nLog: ${jsonl}\nTranscript: ${jsonl.replace(/\.jsonl$/, '.md')}`);
