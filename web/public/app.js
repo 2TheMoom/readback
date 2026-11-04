@@ -64,8 +64,10 @@
    * so nothing waiting for the owner is ever hidden.
    */
   function items() {
-    var used = {};
-    var list = S.activity.map(function (a) {
+    var used = {}, seen = {};
+    // The guard checks a request again after the owner approves it: show the request once, as its newest check.
+    var latest = S.activity.filter(function (a) { if (a.request_hash && seen[a.request_hash]) return false; seen[a.request_hash] = true; return true; });
+    var list = latest.map(function (a) {
       var h = S.holds.filter(function (y) { return !used[y.id] && y.review && y.review.request_hash === a.request_hash; })[0] || null;
       if (h) used[h.id] = true;
       return { a: a, h: h };
@@ -138,7 +140,7 @@
       '<h2>Every payment, read back to you before it is signed.</h2>' +
       '<p class="read" style="font-size:20px;color:var(--ink2)">Sign in with the NEAR account that signed your mandate. You will see each payment your agents asked for as one sentence, with anything wrong marked, and the payments held for you to decide.</p>' +
       '<ul class="cm-facts"><li><b>Signing in signs nothing.</b> Readback only asks your wallet to sign when you approve a held payment, and shows you the exact text first.</li><li><b>Your keys stay in your wallet.</b></li><li><b>Approvals are checked twice.</b> Your agent verifies your signature itself before it pays.</li></ul>' +
-      '<div class="row"><button class="btn solid" data-act="connect"' + (S.ready ? '' : ' disabled') + '>Sign in with Meteor</button>' + (S.msg ? '<span class="mono" style="color:var(--red)">' + esc(S.msg) + '</span>' : '') + '</div></div></main>';
+      '<div class="row"><button class="btn solid" data-act="connect"' + (S.ready ? '' : ' disabled') + '>Sign in with a NEAR wallet</button>' + (S.msg ? '<span class="mono" style="color:var(--red)">' + esc(S.msg) + '</span>' : '') + '</div></div></main>';
   }
   function strips(list, sel) {
     var f = S.filter;
