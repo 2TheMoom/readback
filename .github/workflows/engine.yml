@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Rust with the WASI target
-        run: rustup toolchain install stable --profile minimal --target wasm32-wasip1 --target wasm32-wasip2 && rustup default stable
+        run: rustup show active-toolchain   # installs the version pinned in engine/rust-toolchain.toml
       - name: Unit, vector and robustness tests
         run: cargo test --locked
       - name: Build the enclave module
@@ -28,3 +28,7 @@ jobs:
         run: RB_WASM=target/wasm32-wasip1/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
       - name: WASI P2 module (what OutLayer runs) matches native on every vector
         run: cargo build --locked --release --target wasm32-wasip2 && RB_WASM=target/wasm32-wasip2/release/readback-check.wasm cargo test --locked --test vectors wasm -- --nocapture
+      - name: The P2 module is the one deployed to OutLayer, byte for byte
+        run: |
+          sha256sum target/wasm32-wasip2/release/readback-check.wasm
+          test "$(sha256sum target/wasm32-wasip2/release/readback-check.wasm | cut -d" " -f1)" = 89a21ea9327a39899e44d60de66caa6d9ab2845f695ffe5f7489fbdb431e5d69

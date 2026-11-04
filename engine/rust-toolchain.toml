@@ -1,0 +1,5 @@
+# The compiler that built the module OutLayer runs (sha256 89a21ea9...5d69). Other versions emit different bytes.
+[toolchain]
+channel = "1.97.1"
+targets = ["wasm32-wasip1", "wasm32-wasip2"]
+profile = "minimal"
