@@ -1,0 +1,134 @@
+// The whole HOLD loop over HTTP: the guard holds a payment, the web human posts it to the Readback inbox,
+// the owner signs the approval text in their wallet, and only then does the signer run. A lying inbox can
+// stop a payment but never approve one.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer, type Server } from 'node:http';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { ed25519 } from '@noble/curves/ed25519';
+import { createGuard } from '../src/guard.ts';
+import { webHuman, APPROVAL_RECIPIENT } from '../src/approval.ts';
+import { readback } from '../../service/src/readback.ts';
+import { createApp } from '../../service/src/app.ts';
+import { createInbox } from '../../service/src/inbox.ts';
+import { nep413Hash } from '../../service/src/nep413.ts';
+import { load, mandateFrom, signMandate, fakeFetch, newKey } from '../../service/test/helpers.ts';
+
+const quote = { kind: 'quote' as const, quote: load('fixtures/quotes/Q_clean.json') };
+
+/** A Readback server on a free port; the Solana RPCs are down, so the clean quote is held (mint unknown). */
+async function serve(ownerKey: ReturnType<typeof newKey>, tamper?: (body: any) => any): Promise<{ url: string; server: Server }> {
+  const chain = fakeFetch({ sol: ['down', 'down'], nearKeys: { [ownerKey.publicKey]: 'FullAccess' } });
+  const app = createApp({ fetch: chain, inbox: createInbox(mkdtempSync(join(tmpdir(), 'rb-loop-'))) });
+  const server = createServer(async (req, res) => {
+    if (req.url === '/v1/readback') {
+      // Reads are made at the quote's own time, as the recorded fixtures require.
+      const chunks: Buffer[] = []; for await (const c of req) chunks.push(c as Buffer);
+      const body = JSON.parse(Buffer.concat(chunks).toString());
+      const r = await readback(body, { fetch: chain, now: () => new Date(Date.parse(body.quote.timestamp) + 30_000) });
+      res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify(r));
+    }
+    if (tamper && /^\/v1\/holds\/[^/]+$/.test(req.url!) && req.method === 'GET') {
+      const orig = res.end.bind(res);
+      (res as any).end = (data: any) => orig(JSON.stringify(tamper(JSON.parse(String(data)))));
+    }
+    return app(req, res);
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+  return { url: `http://127.0.0.1:${(server.address() as any).port}`, server };
+}
+
+/** The owner at the browser: reads the pending hold and signs its text with their wallet key. */
+async function ownerSigns(url: string, key: ReturnType<typeof newKey>, owner: string, edit = (m: string) => m) {
+  for (;;) {
+    const { holds } = await (await fetch(`${url}/v1/holds?owner=${owner}`)).json();
+    const h = holds.find((x: any) => x.status === 'pending');
+    if (!h) { await new Promise((r) => setTimeout(r, 20)); continue; }
+    const sig = Buffer.from(ed25519.sign(nep413Hash(edit(h.message), new Uint8Array(Buffer.from(h.nonce, 'base64')), h.recipient), key.secret)).toString('base64');
+    return fetch(`${url}/v1/holds/${h.id}/approve`, { method: 'POST', body: JSON.stringify({ publicKey: key.publicKey, signature: sig, accountId: owner }) });
+  }
+}
+
+test('owner approves in the browser: the signer runs once, after the guard checked the signature', async () => {
+  const { signed, key } = signMandate(mandateFrom('M1'));
+  const { url, server } = await serve(key);
+  try {
+    const seen: any[] = [];
+    let posted = '';
+    const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20, onPosted: (_id, link) => { posted = link; } }) });
+    const [d, r] = await Promise.all([g.pay(quote, async (req) => { seen.push(req); return 'tx'; }), ownerSigns(url, key, signed.mandate.owner)]);
+    assert.equal(r.status, 200);
+    assert.deepEqual([d.outcome, d.reason, seen.length], ['executed', 'approved_by_human', 1]);
+    assert.match(posted, /#hold-h_/);
+    const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
+    assert.equal(holds[0].status, 'approved');
+    assert.ok(holds[0].message.includes('Full recipient address: 6UerpTi2CzrJR4iiMvNAgDxbfFVgxhs9cPPuuKkhCDVZ'));
+  } finally { server.close(); }
+});
+
+test('owner refuses in the browser: held, nothing signed', async () => {
+  const { signed, key } = signMandate(mandateFrom('M1'));
+  const { url, server } = await serve(key);
+  try {
+    const seen: any[] = [];
+    const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20 }) });
+    const refuse = (async () => {
+      for (;;) {
+        const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
+        if (holds[0]) return fetch(`${url}/v1/holds/${holds[0].id}/refuse`, { method: 'POST' });
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    })();
+    const [d] = await Promise.all([g.pay(quote, async (req) => { seen.push(req); return 'tx'; }), refuse]);
+    assert.deepEqual([d.outcome, d.reason, seen.length], ['held', 'human_declined', 0]);
+  } finally { server.close(); }
+});
+
+test('a lying inbox that reports an approval the owner never signed for this hold gets nothing signed', async () => {
+  const { signed, key } = signMandate(mandateFrom('M1'));
+  const other = newKey();
+  // Each lie: the right owner key over another text, a different key, and an approval with no signature at all.
+  const lies = [
+    (h: any) => ({ ...h, status: 'approved', approval: { publicKey: key.publicKey, signature: Buffer.from(ed25519.sign(nep413Hash('Readback: approve something else', new Uint8Array(Buffer.from(h.nonce, 'base64')), APPROVAL_RECIPIENT), key.secret)).toString('base64') } }),
+    (h: any) => ({ ...h, status: 'approved', approval: { publicKey: other.publicKey, signature: Buffer.from(ed25519.sign(nep413Hash(h.message, new Uint8Array(Buffer.from(h.nonce, 'base64')), APPROVAL_RECIPIENT), other.secret)).toString('base64') } }),
+    (h: any) => ({ ...h, status: 'approved' }),
+    // The inbox showed the owner its own nonce and got a genuine signature for it: still not this hold's.
+    (h: any) => { const n = Buffer.alloc(32, 9); return { ...h, nonce: n.toString('base64'), status: 'approved', approval: { publicKey: key.publicKey, signature: Buffer.from(ed25519.sign(nep413Hash(h.message, new Uint8Array(n), APPROVAL_RECIPIENT), key.secret)).toString('base64') } }; },
+  ];
+  for (const lie of lies) {
+    const { url, server } = await serve(key, lie);
+    try {
+      const seen: any[] = [];
+      const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20 }) });
+      const d = await g.pay(quote, async (req) => { seen.push(req); return 'tx'; });
+      assert.deepEqual([d.outcome, d.reason, seen.length], ['held', 'human_declined', 0]);
+    } finally { server.close(); }
+  }
+});
+
+test('a lying inbox that swaps in another nonce: the approval is for a different hold, refused', async () => {
+  const { signed, key } = signMandate(mandateFrom('M1'));
+  // The owner is tricked into signing over another nonce: the inbox rejects it, the hold stays pending,
+  // and the agent stops waiting after its own deadline without signing.
+  const { url, server } = await serve(key, (h) => h);
+  try {
+    const seen: any[] = [];
+    const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20, waitMs: 400 }) });
+    const forge = (async () => {
+      for (;;) {
+        const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
+        const h = holds[0];
+        if (!h) { await new Promise((r) => setTimeout(r, 20)); continue; }
+        const sig = Buffer.from(ed25519.sign(nep413Hash(h.message, new Uint8Array(32).fill(7), h.recipient), key.secret)).toString('base64');
+        return fetch(`${url}/v1/holds/${h.id}/approve`, { method: 'POST', body: JSON.stringify({ publicKey: key.publicKey, signature: sig }) });
+      }
+    })();
+    const [d, r] = await Promise.all([g.pay(quote, async (req) => { seen.push(req); return 'tx'; }), forge]);
+    assert.equal(r.status, 409);
+    assert.equal(seen.length, 0);
+    assert.deepEqual([d.outcome, d.reason], ['held', 'human_declined']);
+  } finally { server.close(); }
+});

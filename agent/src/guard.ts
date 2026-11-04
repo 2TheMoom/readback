@@ -11,7 +11,7 @@ export interface SignedMandate { mandate: Record<string, unknown>; signature: Re
 export interface Hold { check: string; status: string; why?: string }
 
 /** What the human is shown on HOLD. `message` is the full text to show them. */
-export interface Review { sentence: string; holds: Hold[]; request_hash: string; quote_hash?: string; message: string }
+export interface Review { sentence: string; holds: Hold[]; request_hash: string; quote_hash?: string; recipient?: string; message: string }
 /** Resolve to exactly `true` to approve. Any other value, a throw or a timeout declines. */
 export type Human = (review: Review) => Promise<unknown>;
 
@@ -151,7 +151,7 @@ export function createGuard(opts: GuardOptions) {
     if (first.verdict === 'HOLD') {
       if (!opts.askHuman) return done(first, 'held', 'no_human');
       let approved: unknown;
-      try { approved = await withTimeout(Promise.resolve(opts.askHuman({ sentence: first.sentence!, holds: first.holds, request_hash: hash, quote_hash: first.quote_hash, message: approvalMessage(first.sentence!, first.holds, hash, recipientOf(req)) })), opts.humanTimeoutMs ?? 600_000); }
+      try { approved = await withTimeout(Promise.resolve(opts.askHuman({ sentence: first.sentence!, holds: first.holds, request_hash: hash, quote_hash: first.quote_hash, recipient: recipientOf(req), message: approvalMessage(first.sentence!, first.holds, hash, recipientOf(req)) })), opts.humanTimeoutMs ?? 600_000); }
       catch (e) { return done(first, 'held', (e as Error)?.message === 'timeout' ? 'human_timeout' : 'human_error'); }
       if (approved !== true) return done(first, 'held', 'human_declined');
       // The human answered for what they saw. Look again: anything new since then is refused, not waved through.
