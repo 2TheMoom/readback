@@ -132,3 +132,11 @@ test('a lying inbox that swaps in another nonce: the approval is for a different
     assert.deepEqual([d.outcome, d.reason], ['held', 'human_declined']);
   } finally { server.close(); }
 });
+
+test('the approval text is plain ASCII, so every wallet signs the same bytes we verify', async () => {
+  const { approvalText } = await import('../src/approval.ts');
+  const t = approvalText({ id: 'h_abcdefghijkl', owner: 'olumi15.near', agent: 'invoice-bot', review: { sentence: 'send 2.5 USDC to Abu on Base (0x095e…abc5), refund to invo…near, Аcme', holds: [{ check: 'amount', status: 'warn', why: 'over_cap' }], request_hash: 'ab'.repeat(32), recipient: '0x095e759bAf96B062696FA6A89040C81214a1abc5', message: '' } });
+  assert.match(t, /^[\x20-\x7E\n]+$/);
+  assert.ok(t.includes('(0x095e...abc5)') && t.includes('invo...near'));
+  assert.ok(t.includes('?cme'), 'a Cyrillic lookalike letter shows as ?, not as a real A');
+});

@@ -1,5 +1,6 @@
 // node demo/pay.ts <recipient> <amount>        dry run: everything up to the signed intent, nothing submitted
 // node demo/pay.ts <recipient> <amount> --live  also submits, if Readback allows it
+// add --web to have a held payment approved in the Readback web app (signed in the owner's wallet)
 // node demo/pay.ts --check                      only the start-up self-check (what the agent's key can do)
 //
 // Environment: READBACK_MANDATE_FILE (the owner-signed mandate JSON, default ~/.readback/mandate.json, which
@@ -12,6 +13,7 @@ import { homedir } from 'node:os';
 import { loadOrCreateKey, KEY_FILE } from './key.ts';
 import { startAgent } from './agent.ts';
 import { terminalHuman } from '../src/human.ts';
+import { webHuman } from '../src/approval.ts';
 
 const args = process.argv.slice(2);
 const key = loadOrCreateKey();
@@ -21,7 +23,12 @@ const mandateFile = process.env.READBACK_MANDATE_FILE ?? join(homedir(), '.readb
 if (!existsSync(mandateFile)) { console.error(`No signed mandate at ${mandateFile}: sign one with the setup page (setup/, npm start).`); process.exit(2); }
 const signedMandate = JSON.parse(readFileSync(mandateFile, 'utf8'));
 
-const agent = await startAgent({ key, signedMandate, readbackUrl: process.env.READBACK_URL ?? 'http://127.0.0.1:8787', askHuman: terminalHuman(), live: args.includes('--live'), requireEnclave: process.env.READBACK_REQUIRE_ENCLAVE === '1' });
+const readbackUrl = process.env.READBACK_URL ?? 'http://127.0.0.1:8787';
+// --web: a held payment waits for the owner in the Readback web app instead of on this terminal.
+const askHuman = args.includes('--web')
+  ? webHuman({ url: readbackUrl, signedMandate, onPosted: (_id, link) => console.log(`\nHeld for the owner. Approve or refuse it at ${link}`) })
+  : terminalHuman();
+const agent = await startAgent({ key, signedMandate, readbackUrl, askHuman, live: args.includes('--live'), requireEnclave: process.env.READBACK_REQUIRE_ENCLAVE === '1' });
 const c = agent.check;
 console.log(`Agent key ${key.publicKey}\n  on NEAR: ${typeof c.permission === 'object' ? `function-call key, only ${c.permission.receiver_id}, methods ${c.permission.method_names.join(', ') || '(all)'}, gas allowance ${c.permission.allowance ?? 'unlimited'}` : c.permission}\n  in intents.near: ${c.registered === true ? 'registered' : c.registered}\n  balance: ${c.balance}`);
 if (!agent.ok) { console.error(`Refusing to run: ${c.problems.join(', ')}`); process.exit(1); }

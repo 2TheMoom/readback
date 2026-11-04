@@ -77,7 +77,11 @@ export function createInbox(dir = process.env.READBACK_DATA_DIR ?? join(homedir(
     if (expire(h).status !== 'pending') return { ok: false, reason: h.status };
     if (!sig || typeof sig.publicKey !== 'string' || typeof sig.signature !== 'string') return { ok: false, reason: 'bad_signature' };
     if (sig.accountId !== undefined && sig.accountId !== h.owner) return { ok: false, reason: 'signer_is_not_owner' };
-    if (!verifyNep413(sig, h.message, new Uint8Array(Buffer.from(h.nonce, 'base64')), h.recipient)) return { ok: false, reason: 'bad_signature' };
+    if (!verifyNep413(sig, h.message, new Uint8Array(Buffer.from(h.nonce, 'base64')), h.recipient)) {
+      // Public values only: enough to work out which bytes a wallet really signed.
+      console.warn(`rejected approval for ${id}: ${JSON.stringify({ publicKey: sig.publicKey, signature: sig.signature, accountId: sig.accountId })}`);
+      return { ok: false, reason: 'bad_signature' };
+    }
     const key = await isFullAccessKey(f, h.owner, sig.publicKey);
     if (!key.ok) return { ok: false, reason: `key_${key.reason}` };
     if (expire(h).status !== 'pending') return { ok: false, reason: h.status };

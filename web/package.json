@@ -1,0 +1,17 @@
+{
+  "name": "readback-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Readback web app: the owner's queue of checked payments and held approvals, served by service/",
+  "license": "MIT",
+  "scripts": {
+    "bundle": "esbuild entry.js --bundle --format=iife --minify --outfile=public/near-connect.bundle.js"
+  },
+  "dependencies": {
+    "@hot-labs/near-connect": "0.11.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.2"
+  }
+}

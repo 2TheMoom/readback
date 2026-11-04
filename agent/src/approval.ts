@@ -14,9 +14,18 @@ export const APPROVAL_RECIPIENT = process.env.READBACK_RECIPIENT ?? 'readback.ap
 
 export interface HoldInfo { id: string; owner: string; agent: string; review: Review }
 
+/**
+ * Plain ASCII only. Meteor's signature over text containing "…" did not verify against the NEP-413 bytes
+ * (2026-11-04), while ASCII mandates always have; any other character becomes "?", which also makes a
+ * homoglyph visible instead of passing it off as a real letter.
+ */
+export function ascii(s: string): string {
+  return s.replace(/…/g, '...').replace(/[^\x20-\x7E\n]/g, '?');
+}
+
 /** The exact text the owner signs to approve one held payment. Wallets show only this text, so it says it all. */
 export function approvalText(h: HoldInfo): string {
-  return [
+  return ascii([
     `Readback: approve a payment held for ${h.owner}.`,
     h.review.sentence,
     ...(h.review.recipient ? [`Full recipient address: ${h.review.recipient}`] : []),
@@ -24,7 +33,7 @@ export function approvalText(h: HoldInfo): string {
     `Request: sha256:${h.review.request_hash}`,
     `Hold: ${h.id} (agent ${h.agent})`,
     'Sign only if you expected exactly this payment.',
-  ].join('\n');
+  ].join('\n'));
 }
 
 export interface WebHumanOptions {
