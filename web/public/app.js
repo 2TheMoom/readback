@@ -115,7 +115,11 @@
       var failing = (p.checks || []).filter(function (c) { return checks[c] && checks[c] !== 'ok'; });
       failing.forEach(function (c) { covered[c] = true; });
       notes.push({ n: n, s: st, ids: failing });
-      var words = p.text.split(' '), last = words.pop(), head = words.length ? esc(words.join(' ')) + ' ' : '';
+      // The mark stays glued to the end of the marked words. A long address keeps only its last four characters
+      // with the mark, so the rest can wrap on a phone instead of pushing the page sideways.
+      var words = p.text.split(' '), last = words.pop(), head = words.length ? words.join(' ') + ' ' : '';
+      if (last.length > 12) { head += last.slice(0, -4); last = last.slice(-4); }
+      head = esc(head);
       var cls = st === 'error' ? 'warn' : st;
       html += '<span class="tk on ' + cls + (p.text.length > 24 && p.text.indexOf(' ') < 0 ? ' m' : '') + '" aria-describedby="nt-' + key + '-' + n + '">' + head + '<span class="nw" data-n="' + n + '">' + esc(last) + '</span></span>';
     });
@@ -432,7 +436,15 @@
     if (ev.key === 'Escape' && S.modal && !S.modal.busy) { S.modal = null; draw(); }
     if (ev.key === 'Enter' && ev.target && ev.target.id === 'vtask') runVerify();
   });
-  window.addEventListener('hashchange', function () { draw(); var r = routeOf(); if (r !== 'queue') { loadSite(r); window.scrollTo(0, 0); } else load(); });
+  var lastRoute = routeOf();
+  window.addEventListener('hashchange', function () {
+    draw();
+    var r = routeOf();
+    // A new page starts at the top; picking a payment inside the queue keeps your place in the list.
+    if (r !== lastRoute) window.scrollTo(0, 0);
+    lastRoute = r;
+    if (r !== 'queue') loadSite(r); else load();
+  });
   // Only the queue polls: a redraw elsewhere would wipe what someone is typing.
   setInterval(function () { if (routeOf() === 'queue' && (!S.modal || !S.modal.busy)) load(); }, 3000);
   draw();

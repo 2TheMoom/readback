@@ -379,3 +379,5 @@ select.blank{cursor:pointer}
 /* A sentence inside a narrow card: notes go under it, not in a margin column that squeezes it to one word a line. */
 .answer .rb{grid-template-columns:minmax(0,1fr);gap:16px}
 .answer .notes{border-left:0;padding-left:0;border-top:1.5px solid var(--rule);padding-top:14px}
+/* Long addresses wrap inside the sentence on narrow screens. */
+.rb-s,.notes{overflow-wrap:anywhere}
