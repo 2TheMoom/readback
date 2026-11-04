@@ -14,6 +14,7 @@ import { webHuman, APPROVAL_RECIPIENT } from '../src/approval.ts';
 import { readback } from '../../service/src/readback.ts';
 import { createApp } from '../../service/src/app.ts';
 import { createInbox } from '../../service/src/inbox.ts';
+import { createSessions } from '../../service/src/session.ts';
 import { nep413Hash } from '../../service/src/nep413.ts';
 import { load, mandateFrom, signMandate, fakeFetch, newKey } from '../../service/test/helpers.ts';
 
@@ -22,7 +23,7 @@ const quote = { kind: 'quote' as const, quote: load('fixtures/quotes/Q_clean.jso
 /** A Readback server on a free port; the Solana RPCs are down, so the clean quote is held (mint unknown). */
 async function serve(ownerKey: ReturnType<typeof newKey>, tamper?: (body: any) => any): Promise<{ url: string; server: Server }> {
   const chain = fakeFetch({ sol: ['down', 'down'], nearKeys: { [ownerKey.publicKey]: 'FullAccess' } });
-  const app = createApp({ fetch: chain, inbox: createInbox(mkdtempSync(join(tmpdir(), 'rb-loop-'))) });
+  const app = createApp({ fetch: chain, inbox: createInbox(mkdtempSync(join(tmpdir(), 'rb-loop-'))), sessions: createSessions() });
   const server = createServer(async (req, res) => {
     if (req.url === '/v1/readback') {
       // Reads are made at the quote's own time, as the recorded fixtures require.
@@ -41,10 +42,20 @@ async function serve(ownerKey: ReturnType<typeof newKey>, tamper?: (body: any) =
   return { url: `http://127.0.0.1:${(server.address() as any).port}`, server };
 }
 
+/** The owner signs in as the browser does: the server's challenge text, signed by the wallet key. Returns the cookie. */
+async function signIn(url: string, key: ReturnType<typeof newKey>, account: string): Promise<string> {
+  const c = await (await fetch(`${url}/v1/session/challenge?account=${account}`)).json();
+  const sig = Buffer.from(ed25519.sign(nep413Hash(c.message, new Uint8Array(Buffer.from(c.nonce, 'base64')), c.recipient), key.secret)).toString('base64');
+  const r = await fetch(`${url}/v1/session`, { method: 'POST', body: JSON.stringify({ accountId: account, publicKey: key.publicKey, signature: sig, nonce: c.nonce }) });
+  assert.equal(r.status, 200);
+  return r.headers.get('set-cookie')!.split(';')[0];
+}
+
 /** The owner at the browser: reads the pending hold and signs its text with their wallet key. */
 async function ownerSigns(url: string, key: ReturnType<typeof newKey>, owner: string, edit = (m: string) => m) {
+  const cookie = await signIn(url, key, owner);
   for (;;) {
-    const { holds } = await (await fetch(`${url}/v1/holds?owner=${owner}`)).json();
+    const { holds } = await (await fetch(`${url}/v1/holds`, { headers: { cookie } })).json();
     const h = holds.find((x: any) => x.status === 'pending');
     if (!h) { await new Promise((r) => setTimeout(r, 20)); continue; }
     const sig = Buffer.from(ed25519.sign(nep413Hash(edit(h.message), new Uint8Array(Buffer.from(h.nonce, 'base64')), h.recipient), key.secret)).toString('base64');
@@ -63,7 +74,7 @@ test('owner approves in the browser: the signer runs once, after the guard check
     assert.equal(r.status, 200);
     assert.deepEqual([d.outcome, d.reason, seen.length], ['executed', 'approved_by_human', 1]);
     assert.match(posted, /#hold-h_/);
-    const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
+    const { holds } = await (await fetch(`${url}/v1/holds`, { headers: { cookie: await signIn(url, key, signed.mandate.owner) } })).json();
     assert.equal(holds[0].status, 'approved');
     assert.ok(holds[0].message.includes('Full recipient address: 6UerpTi2CzrJR4iiMvNAgDxbfFVgxhs9cPPuuKkhCDVZ'));
   } finally { server.close(); }
@@ -76,9 +87,10 @@ test('owner refuses in the browser: held, nothing signed', async () => {
     const seen: any[] = [];
     const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20 }) });
     const refuse = (async () => {
+      const cookie = await signIn(url, key, signed.mandate.owner);
       for (;;) {
-        const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
-        if (holds[0]) return fetch(`${url}/v1/holds/${holds[0].id}/refuse`, { method: 'POST' });
+        const { holds } = await (await fetch(`${url}/v1/holds`, { headers: { cookie } })).json();
+        if (holds[0]) return fetch(`${url}/v1/holds/${holds[0].id}/refuse`, { method: 'POST', headers: { cookie } });
         await new Promise((r) => setTimeout(r, 20));
       }
     })();
@@ -118,8 +130,9 @@ test('a lying inbox that swaps in another nonce: the approval is for a different
     const seen: any[] = [];
     const g = createGuard({ url, agent: 'invoice-bot', signedMandate: signed, askHuman: webHuman({ url, signedMandate: signed, pollMs: 20, waitMs: 400 }) });
     const forge = (async () => {
+      const cookie = await signIn(url, key, signed.mandate.owner);
       for (;;) {
-        const { holds } = await (await fetch(`${url}/v1/holds?owner=${signed.mandate.owner}`)).json();
+        const { holds } = await (await fetch(`${url}/v1/holds`, { headers: { cookie } })).json();
         const h = holds[0];
         if (!h) { await new Promise((r) => setTimeout(r, 20)); continue; }
         const sig = Buffer.from(ed25519.sign(nep413Hash(h.message, new Uint8Array(32).fill(7), h.recipient), key.secret)).toString('base64');

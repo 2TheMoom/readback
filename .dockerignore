@@ -1,0 +1,15 @@
+**/node_modules
+**/target
+.git
+.env
+.env.*
+*.log
+research
+setup
+agent/demo
+agent/test
+service/test
+docs/attack-demo
+docs/rules
+web/public/near-connect.bundle.js
+web/public/wallets

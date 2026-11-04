@@ -30,9 +30,14 @@ export type Attested = { ok: true; output: EngineOutput; receipt: Receipt } | { 
 
 const sha256 = (b: string | Buffer) => createHash('sha256').update(b).digest('hex');
 
-/** The payment key the OutLayer CLI saved (`outlayer keys create`), read at call time and never logged. */
+/**
+ * The payment key: READBACK_OUTLAYER_PAYMENT_KEY (a hosting secret), else the one the OutLayer CLI saved
+ * (`outlayer keys create`). Read at call time and never logged.
+ */
 export function paymentKey(): string | null {
   const [owner] = OUTLAYER_PROJECT.split('/');
+  const fromEnv = process.env.READBACK_OUTLAYER_PAYMENT_KEY?.trim();
+  if (fromEnv) return /^[a-z0-9._-]+:\d+:[A-Za-z0-9_-]+$/.test(fromEnv) && fromEnv.startsWith(`${owner}:`) ? fromEnv : null;
   const nonce = process.env.READBACK_OUTLAYER_NONCE ?? '1';
   try {
     const keys = JSON.parse(readFileSync(join(homedir(), '.outlayer', 'mainnet', 'payment-keys.json'), 'utf8'));

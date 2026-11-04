@@ -94,9 +94,12 @@
   async function load() {
     if (!S.owner) return;
     try {
-      var r = await Promise.all([api('/v1/activity?owner=' + encodeURIComponent(S.owner)), api('/v1/holds?owner=' + encodeURIComponent(S.owner))]);
+      var r = await Promise.all([api('/v1/activity'), api('/v1/holds')]);
       S.activity = r[0].activity || []; S.holds = r[1].holds || []; S.loaded = true;
-    } catch (e) { S.msg = 'Could not reach Readback: ' + e.message; }
+    } catch (e) {
+      // The session ended (or the server restarted): sign in again.
+      if (/sign_in/.test(e.message)) { S.owner = null; S.activity = []; S.holds = []; } else S.msg = 'Could not reach Readback: ' + e.message;
+    }
     draw();
   }
 
@@ -139,15 +142,38 @@
     var pc = pending();
     var acct = S.owner
       ? '<div class="acctwrap"><button class="acct-btn" data-act="signout" title="Disconnect"><span class="dot"></span><b>' + esc(S.owner) + '</b><span class="wn">' + esc(S.walletName) + '</span><span aria-hidden="true">×</span></button></div>'
-      : '<div class="acctwrap"><button class="btn solid sm" data-act="connect"' + (S.ready ? '' : ' disabled') + '>Sign in</button></div>';
+      : '<div class="acctwrap"><button class="btn solid sm" data-act="' + (S.account ? 'prove' : 'connect') + '"' + (S.ready ? '' : ' disabled') + '>Sign in</button></div>';
     return '<header class="appbar"><div class="wrap"><a class="brand" href="#home">' + mark(30) + '<span>Readback</span></a><nav class="tabs" aria-label="App"><a href="#queue" aria-current="page">Queue' + (pc ? ' <span class="count">' + pc + '</span>' : '') + '</a></nav>' + acct + '</div></header>';
   }
   function signedOut() {
     return '<main class="app"><div class="sheet pad stack" style="max-width:760px;margin:clamp(24px,8vh,96px) auto;gap:22px"><span class="eyebrow">Your agents\' payments</span>' +
       '<h2>Every payment, read back to you before it is signed.</h2>' +
       '<p class="read" style="font-size:20px;color:var(--ink2)">Sign in with the NEAR account that signed your mandate. You will see each payment your agents asked for as one sentence, with anything wrong marked, and the payments held for you to decide.</p>' +
-      '<ul class="cm-facts"><li><b>Signing in signs nothing.</b> Readback only asks your wallet to sign when you approve a held payment, and shows you the exact text first.</li><li><b>Your keys stay in your wallet.</b></li><li><b>Approvals are checked twice.</b> Your agent verifies your signature itself before it pays.</li></ul>' +
-      '<div class="row"><button class="btn solid" data-act="connect"' + (S.ready ? '' : ' disabled') + '>Sign in with a NEAR wallet</button>' + (S.msg ? '<span class="mono" style="color:var(--red)">' + esc(S.msg) + '</span>' : '') + '</div></div></main>';
+      '<ul class="cm-facts"><li><b>Signing in signs one message, not a transaction.</b> It proves the account is yours, so nobody else can read its payments. It moves nothing.</li><li><b>Your keys stay in your wallet.</b></li><li><b>Approvals are checked twice.</b> Your agent verifies your signature itself before it pays.</li></ul>' +
+      (S.account && S.proof ? '<div class="stack" style="gap:8px"><span class="eyebrow">Your wallet will show exactly this text</span><div class="raw wrapit">' + esc(S.proof.message) + '</div></div>' : '') +
+      '<div class="row">' + (S.account
+        ? '<button class="btn solid" data-act="prove"' + (S.proving ? ' disabled' : '') + '>' + (S.proving ? 'Waiting for your wallet…' : 'Sign in as ' + esc(S.account)) + '</button><button class="btn quiet" data-act="signout">Use another account</button>'
+        : '<button class="btn solid" data-act="connect"' + (S.ready ? '' : ' disabled') + '>Connect a NEAR wallet</button>') +
+      (S.msg ? '<span class="mono" style="color:var(--red)">' + esc(S.msg) + '</span>' : '') + '</div></div></main>';
+  }
+  /** Ask for the sign-in text, show it, have the wallet sign it, and let the server set the session cookie. */
+  async function prove() {
+    if (!S.wallet || !S.account || S.proving) return;
+    S.msg = ''; S.proving = true; draw();
+    try {
+      S.proof = await api('/v1/session/challenge?account=' + encodeURIComponent(S.account)); draw();
+      var signed = await S.wallet.signMessage({ message: S.proof.message, recipient: S.proof.recipient, nonce: b64ToBytes(S.proof.nonce) });
+      var r = await api('/v1/session', { accountId: signed.accountId || S.account, publicKey: signed.publicKey, signature: signed.signature, nonce: S.proof.nonce });
+      S.owner = r.account; S.proof = null;
+    } catch (e) { S.msg = 'Not signed in: ' + String(e.message || e).replace(/_/g, ' '); }
+    S.proving = false; draw();
+    if (S.owner) load();
+  }
+  async function signOut() {
+    try { await api('/v1/session/out', {}); } catch (e) { /* the cookie expires anyway */ }
+    S.owner = null; S.activity = []; S.holds = []; S.proof = null;
+    if (S.wallet) { try { await S.connector.disconnect(S.wallet); } catch (e) { /* already gone */ } }
+    S.wallet = null; S.account = null; draw();
   }
   function strips(list, sel) {
     var f = S.filter;
@@ -361,10 +387,12 @@
     try {
       var manifest = await (await fetch('manifest.json')).json();
       S.connector = new window.NearConnector({ network: 'mainnet', manifest: manifest, features: { signMessage: true } });
-      S.connector.on('wallet:signIn', async function (e) { S.wallet = await S.connector.wallet(); S.walletName = (S.wallet.manifest && S.wallet.manifest.name) || 'your wallet'; S.owner = e.accounts && e.accounts[0] && e.accounts[0].accountId; load(); });
-      S.connector.on('wallet:signOut', function () { S.wallet = null; S.owner = null; S.activity = []; S.holds = []; draw(); });
+      S.connector.on('wallet:signIn', async function (e) { S.wallet = await S.connector.wallet(); S.walletName = (S.wallet.manifest && S.wallet.manifest.name) || 'your wallet'; S.account = e.accounts && e.accounts[0] && e.accounts[0].accountId; draw(); prove(); });
+      S.connector.on('wallet:signOut', function () { S.wallet = null; S.account = null; draw(); });
       S.ready = true;
-      try { var w = await S.connector.wallet(); var acc = await w.getAccounts(); if (acc && acc[0] && acc[0].accountId) { S.wallet = w; S.walletName = (w.manifest && w.manifest.name) || 'your wallet'; S.owner = acc[0].accountId; } } catch (e) { /* not signed in */ }
+      try { var w = await S.connector.wallet(); var acc = await w.getAccounts(); if (acc && acc[0] && acc[0].accountId) { S.wallet = w; S.walletName = (w.manifest && w.manifest.name) || 'your wallet'; S.account = acc[0].accountId; } } catch (e) { /* not connected */ }
+      // The session cookie, not the wallet, decides whose queue this page may read.
+      try { var sess = await api('/v1/session'); if (sess.account && sess.account === S.account) S.owner = sess.account; } catch (e) { /* signed out */ }
     } catch (e) { S.msg = 'The wallet library did not load: ' + e.message; }
     draw(); if (routeOf() === 'queue') load();
   }
@@ -389,7 +417,8 @@
     var act = t.getAttribute('data-act'), id = t.getAttribute('data-id');
     if (act === 'closemodal' && t !== ev.target && t.classList.contains('scrim')) return;
     if (act === 'connect' && S.connector) S.connector.connect();
-    else if (act === 'signout' && S.wallet) S.connector.disconnect(S.wallet);
+    else if (act === 'signout') signOut();
+    else if (act === 'prove') prove();
     else if (act === 'filter') { S.filter = id; draw(); }
     else if (act === 'review') { S.modal = { id: id, busy: false, err: '' }; draw(); }
     else if (act === 'closemodal') { S.modal = null; draw(); }
