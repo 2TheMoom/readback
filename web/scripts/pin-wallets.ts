@@ -15,9 +15,9 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const SOURCE = 'https://raw.githubusercontent.com/hot-dao/near-selector/refs/heads/main/repository/manifest.json';
-/** near-connect's own list, minus: trezu-wallet and ethereum-wallets (cannot sign messages), unity-wallet (the
- * WalletConnect executor again) and near-cli (a developer tool, not a wallet an owner approves with). */
-const OFFER = ['meteor-wallet', 'hot-wallet', 'intear-wallet', 'mynearwallet', 'ledger', 'okx-wallet', 'near-mobile', 'nightly-wallet', 'hana-wallet', 'wallet-connect'];
+/** Meteor (tested end to end) and MyNearWallet (the successor of the original NEAR Wallet, a web wallet that
+ * needs no install). Each wallet offered is code trusted on the approval page and needs its own live test. */
+const OFFER = ['meteor-wallet', 'mynearwallet'];
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUB = join(HERE, '..', 'public');
