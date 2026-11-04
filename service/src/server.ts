@@ -10,14 +10,15 @@ import { engineSha256 } from './engine.ts';
 import { runAttested, paymentKey, OUTLAYER_PROJECT } from './outlayer.ts';
 import { createInbox } from './inbox.ts';
 import { createApp } from './app.ts';
+import { createDemo } from './demo.ts';
 
 const PORT = Number(process.env.PORT ?? 8787), HOST = process.env.HOST ?? '127.0.0.1';
 const ENCLAVE = process.env.READBACK_OUTLAYER === 'on';
 if (ENCLAVE && !paymentKey()) throw new Error('READBACK_OUTLAYER=on but no OutLayer payment key was found (outlayer keys create)');
 
+const attest = ENCLAVE ? (input: unknown) => runAttested(fetch, input) : undefined;
 const app = createApp({
-  fetch, inbox: createInbox(),
-  attest: ENCLAVE ? (input: unknown) => runAttested(fetch, input) : undefined, enclave: ENCLAVE ? OUTLAYER_PROJECT : null,
+  fetch, inbox: createInbox(), demo: createDemo({ attest }), attest, enclave: ENCLAVE ? OUTLAYER_PROJECT : null,
   webDir: process.env.READBACK_WEB_DIR ?? join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'web', 'public'),
   origins: (process.env.READBACK_ORIGINS ?? '').split(',').filter(Boolean),
 });

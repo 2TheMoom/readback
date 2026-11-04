@@ -4,34 +4,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { runEngine } from '../src/engine.ts';
 import { load } from './helpers.ts';
-
-function mutate(quote: any, intent: any, muts: any[]) {
-  const msg = intent ? JSON.parse(intent.intent.payload.message) : null;
-  for (const m of muts ?? []) {
-    const isMsg = m.path.startsWith('msg.');
-    const parts = (isMsg ? m.path.slice(4) : m.path).split('.');
-    let node = isMsg ? msg : quote;
-    for (const p of parts.slice(0, -1)) node = node[p];
-    const last = parts[parts.length - 1];
-    if (m.op === 'set') node[last] = m.value; else node[last].push(m.value);
-  }
-  if (intent) intent.intent.payload.message = JSON.stringify(msg);
-}
+import { engineInput } from '../src/vectors.ts';
 
 test('every test vector gives its expected verdict through the WASI engine', () => {
-  const doc = load('vectors.json'), mandates = load('fixtures/mandates.json'), tokens = load('fixtures/tokens.json');
-  const code = load('fixtures/rpc/base-eth_getCode.json').answers;
+  const doc = load('vectors.json');
   const failures: string[] = [];
   for (const v of doc.vectors) {
-    const rpc = { ...v.rpc };
-    if (rpc.evm_code_ref) rpc.evm_code = code[rpc.evm_code_ref.toLowerCase()];
-    let input: any;
-    if (v.kind === 'destination') input = { kind: 'destination', chain: v.chain, address: v.address, token_contract: v.token_contract, rpc };
-    else {
-      const quote = load(`fixtures/quotes/${v.quote}.json`), intent = v.intent ? load(`fixtures/intents/${v.intent}.json`) : null;
-      mutate(quote, intent, v.mutate);
-      input = { kind: v.kind, now: v.now, mandate: mandates[v.mandate], quote, intent, tokens, rpc };
-    }
+    const input = engineInput(v);
     const out = runEngine(input);
     const nonOk = (s: string) => Object.keys(out.c).filter((k) => out.c[k] === s).sort();
     const want = (k: string) => (Array.isArray(v.expect[k]) ? [...v.expect[k]].sort() : []);
