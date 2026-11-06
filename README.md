@@ -42,12 +42,12 @@ The owner's queue (**Open your queue**) needs a NEAR wallet (Meteor or Intear) a
 
 ## Run it yourself
 
-Requirements: Node 24, Rust with the `wasm32-wasip1` target. Every command below runs offline against recorded fixtures except where noted.
+Requirements: Node 24 and Rust (rustup installs the pinned 1.97.1 and its WASI targets from `engine/rust-toolchain.toml`). Run the rows in order: the agent tests use the engine module and packages the service row builds. Every command runs offline against recorded fixtures except where noted.
 
 | Do | See |
 |---|---|
 | `cd engine && cargo test --locked` | all test functions pass; `every_vector_matches_its_expectation` covers all 65 vectors |
-| `cd service && npm ci && npm run engine && npm test` | 43 pass, 0 fail (all 65 vectors through the WASI module, mandates, the inbox, sign-in, Break it, Verify, receipts) |
+| `cd service && npm ci && npm run engine && npm test` | 44 pass, 0 fail (all 65 vectors through the WASI module, mandates, the inbox, sign-in, Break it, Verify, receipts) |
 | `cd agent && npm ci && npm test` | 41 pass, 0 fail (the guard against the real service, the HOLD loop over HTTP with a lying inbox, the attack demo) |
 | `cd setup && npm ci && npm test` | 8 pass, 0 fail |
 | read `docs/attack-demo/scripted-model.md` and `near-ai-qwen3.8-27b.md` | the attack demo's real runs: a prompt-injected agent reads four invoices; the genuine one clears, the lookalike and the "processing fee" are refused, the inflated amount is held. Rerunning it needs the agent's mainnet key and mandate (`npm run attack -- --scripted`); its logic is also covered offline by `agent/test/attack.test.ts` |
