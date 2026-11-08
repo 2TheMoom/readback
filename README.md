@@ -5,7 +5,7 @@ Readback is a clear-signing layer for AI agents that pay through NEAR Intents. B
 - **Live:** https://readback-production-7628.up.railway.app
 - **Tracks:** AI Security & Defense (`security`), Agent Economy (`agents`)
 - **Built for:** NEAR HACKATHON, 1 to 14 November 2026
-- **Demo video:** (link added with the demo post)
+- **Demo post:** https://x.com/Olumi441/status/2119463898327683417
 
 ## The problem
 
